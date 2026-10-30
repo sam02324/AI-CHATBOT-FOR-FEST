@@ -1,29 +1,24 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { createClient, type Client } from "@libsql/client";
+import postgres from "postgres";
 import { EVENT_FIELDS, type EventDetails, type FestEvent } from "./event-fields";
 
 // Column names only ever come from the fixed EVENT_FIELDS list; values are always bound parameters.
 const COLUMNS = EVENT_FIELDS.join(", ");
-const PLACEHOLDERS = EVENT_FIELDS.map(() => "?").join(", ");
-const ASSIGNMENTS = EVENT_FIELDS.map((field) => `${field} = ?`).join(", ");
+const PLACEHOLDERS = EVENT_FIELDS.map((_, index) => `$${index + 2}`).join(", ");
+const ASSIGNMENTS = EVENT_FIELDS.map((field, index) => `${field} = $${index + 2}`).join(", ");
 
-let database: Promise<Client> | undefined;
+let database: Promise<postgres.Sql> | undefined;
 
-// Uses Turso when TURSO_DATABASE_URL is set, otherwise a local SQLite file for development.
-function connect() {
-  let url = process.env.TURSO_DATABASE_URL;
-  if (!url) {
-    const file = process.env.DB_FILE || path.join(process.cwd(), "data", "fest.db");
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    url = `file:${file}`;
-  }
-  const client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+// Works with any Postgres connection string, including Neon and Supabase.
+async function connect() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set.");
+  const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+  // One connection per serverless instance, and no prepared statements so connection poolers work.
+  const sql = postgres(url, { max: 1, prepare: false, ssl: isLocal ? false : "require" });
   const columnDefinitions = EVENT_FIELDS.map((field) => `${field} TEXT NOT NULL DEFAULT ''`).join(", ");
-  return client
-    .execute(`CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, ${columnDefinitions})`)
-    .then(() => client);
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, ${columnDefinitions})`);
+  return sql;
 }
 
 function db() {
@@ -39,32 +34,26 @@ function values(details: EventDetails) {
 }
 
 export async function listEvents() {
-  const client = await db();
-  const { rows } = await client.execute(`SELECT id, ${COLUMNS} FROM events ORDER BY date, start_time, name`);
+  const sql = await db();
+  const rows = await sql.unsafe(`SELECT id, ${COLUMNS} FROM events ORDER BY date, start_time, name`);
   return rows.map((row) => ({ ...row })) as unknown as FestEvent[];
 }
 
 export async function createEvent(details: EventDetails): Promise<FestEvent> {
-  const client = await db();
+  const sql = await db();
   const id = randomUUID();
-  await client.execute({
-    sql: `INSERT INTO events (id, ${COLUMNS}) VALUES (?, ${PLACEHOLDERS})`,
-    args: [id, ...values(details)],
-  });
+  await sql.unsafe(`INSERT INTO events (id, ${COLUMNS}) VALUES ($1, ${PLACEHOLDERS})`, [id, ...values(details)]);
   return { id, ...details };
 }
 
 export async function updateEvent(id: string, details: EventDetails): Promise<FestEvent | null> {
-  const client = await db();
-  const result = await client.execute({
-    sql: `UPDATE events SET ${ASSIGNMENTS} WHERE id = ?`,
-    args: [...values(details), id],
-  });
-  return result.rowsAffected === 0 ? null : { id, ...details };
+  const sql = await db();
+  const result = await sql.unsafe(`UPDATE events SET ${ASSIGNMENTS} WHERE id = $1`, [id, ...values(details)]);
+  return result.count === 0 ? null : { id, ...details };
 }
 
 export async function deleteEvent(id: string) {
-  const client = await db();
-  const result = await client.execute({ sql: "DELETE FROM events WHERE id = ?", args: [id] });
-  return result.rowsAffected > 0;
+  const sql = await db();
+  const result = await sql.unsafe("DELETE FROM events WHERE id = $1", [id]);
+  return result.count > 0;
 }

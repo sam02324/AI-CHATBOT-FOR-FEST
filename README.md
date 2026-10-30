@@ -13,7 +13,7 @@ Requires Node.js 20 or later.
 
 1. Run `npm install`.
 2. Create an application in the [Clerk dashboard](https://dashboard.clerk.com).
-3. Copy `.env.example` to `.env.local`, then add your Anthropic API key and your Clerk keys.
+3. Copy `.env.example` to `.env.local`, then add your Anthropic API key, your Clerk keys and a Postgres connection string from Neon or Supabase.
 4. Run `npm run dev` and open http://localhost:3000.
 
 ## Make someone an organiser
@@ -26,7 +26,7 @@ Everyone who signs up is an attendant. To make someone an organiser:
 
 ## Built with
 
-Next.js, React, TypeScript, Tailwind CSS, Turso (SQLite), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-opus-5-5`).
+Next.js, React, TypeScript, Tailwind CSS, Postgres (Neon or Supabase), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-opus-5-5`).
 
 Clerk stores the names and email addresses of people who sign up.
 
