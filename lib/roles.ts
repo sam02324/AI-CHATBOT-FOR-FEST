@@ -33,9 +33,20 @@ export type Ticket = {
   description: string;
   status: TicketStatus;
   response: string;
+  live: boolean;
   created_at: string;
   updated_at: string;
 };
+
+export type TicketMessage = {
+  id: string;
+  sender_role: "attendant" | "staff";
+  sender_name: string;
+  content: string;
+  created_at: string;
+};
+
+export type TicketThread = { status: TicketStatus; messages: TicketMessage[] };
 
 export type ConversationSummary = { id: string; title: string; updated_at: string };
 export type ChatMessage = { role: "user" | "assistant"; content: string };

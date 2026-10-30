@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowUp, History, Plus, RotateCcw, Trash2, X } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, ArrowUp, History, LifeBuoy, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import type { ChatMessage, ConversationSummary, Role } from "@/lib/roles";
+import { TicketConversation } from "@/components/TicketConversation";
+import type { ChatMessage, ConversationSummary, Role, Ticket } from "@/lib/roles";
 
 const SUGGESTIONS = ["What events are happening?", "How do I register?", "Which events have prizes?"];
 
@@ -17,6 +17,12 @@ export function Chat({ role }: { role: Role }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [failedQuestion, setFailedQuestion] = useState("");
+  // The "reach a person" step: null when closed, otherwise whether staff are online.
+  const [handoff, setHandoff] = useState<{ online: boolean | null } | null>(null);
+  const [handoffText, setHandoffText] = useState("");
+  const [handoffError, setHandoffError] = useState("");
+  const [raising, setRaising] = useState(false);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -32,7 +38,41 @@ export function Chat({ role }: { role: Role }) {
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [messages, busy, error]);
+  }, [messages, busy, error, handoff]);
+
+  async function openHandoff(text: string) {
+    setHandoffText(text);
+    setHandoffError("");
+    setHandoff({ online: null });
+    const response = await fetch("/api/presence").catch(() => null);
+    const body = response?.ok ? await response.json() : { online: false };
+    setHandoff({ online: body.online });
+  }
+
+  async function raiseTicket(event: FormEvent) {
+    event.preventDefault();
+    if (!handoffText.trim()) {
+      setHandoffError("Tell us what you need help with.");
+      return;
+    }
+    setRaising(true);
+    setHandoffError("");
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: handoffText }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Something went wrong. Please try again.");
+      setTicket(body);
+      setHandoff(null);
+    } catch (caught) {
+      setHandoffError(caught instanceof TypeError ? "Couldn't reach the server. Please try again." : (caught as Error).message);
+    } finally {
+      setRaising(false);
+    }
+  }
 
   async function requestAnswer(question: string, shown: ChatMessage[]) {
     setBusy(true);
@@ -59,6 +99,7 @@ export function Chat({ role }: { role: Role }) {
       if (!answer) throw new Error("No answer came back. Please try again.");
       setConversationId(response.headers.get("X-Conversation-Id"));
       loadConversations();
+      if (response.headers.get("X-Chat-Action") === "handoff") openHandoff(question);
     } catch (caught) {
       setMessages(shown);
       setFailedQuestion(question);
@@ -89,6 +130,7 @@ export function Chat({ role }: { role: Role }) {
     setError("");
     setFailedQuestion("");
     setHistoryOpen(false);
+    setHandoff(null);
     input.current?.focus();
   }
 
@@ -96,6 +138,8 @@ export function Chat({ role }: { role: Role }) {
     setError("");
     setFailedQuestion("");
     setHistoryOpen(false);
+    setHandoff(null);
+    setTicket(null);
     try {
       const response = await fetch(`/api/conversations/${id}`);
       if (!response.ok) throw new Error();
@@ -179,6 +223,33 @@ export function Chat({ role }: { role: Role }) {
           </div>
         </aside>
 
+        {ticket ? (
+          <div className="flex min-w-0 flex-1 flex-col p-4">
+            <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
+              <button
+                type="button"
+                onClick={() => setTicket(null)}
+                className="-ml-1 inline-flex min-h-11 w-fit items-center gap-2 px-1 text-[15px] font-medium text-muted"
+              >
+                <ArrowLeft aria-hidden className="size-4" />
+                Back to AI chat
+              </button>
+              <div role="status" className="rounded-xl bg-accent-soft p-3 text-[15px]">
+                <p className="font-semibold">
+                  {ticket.live ? "You're connected to the fest team" : "Your ticket is raised"}
+                </p>
+                <p className="mt-1">
+                  {ticket.live
+                    ? "A moderator is online and can see your message. Replies appear here."
+                    : "No moderator is online right now. They'll reply here, and you can find it later in My tickets."}
+                  {" "}Your ticket ID is <span className="font-mono font-semibold">{ticket.id}</span>.
+                </p>
+              </div>
+              <p className="mt-3 text-[15px] text-muted [overflow-wrap:anywhere]">{ticket.description}</p>
+              <TicketConversation ticketId={ticket.id} viewer="attendant" />
+            </div>
+          </div>
+        ) : (
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b border-line px-4 py-1 lg:hidden">
             <button
@@ -252,6 +323,47 @@ export function Chat({ role }: { role: Role }) {
                   )}
                 </div>
               )}
+              {handoff && (
+                <form onSubmit={raiseTicket} className="mt-4 space-y-3 rounded-2xl bg-surface p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold" role="status">
+                      {handoff.online === null
+                        ? "Checking who's available…"
+                        : handoff.online
+                          ? "A moderator is online"
+                          : "No moderator is online right now"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setHandoff(null)}
+                      aria-label="Close"
+                      className="-mt-2 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-full"
+                    >
+                      <X aria-hidden className="size-5" />
+                    </button>
+                  </div>
+                  <div>
+                    <label htmlFor="handoff-text" className="mb-1 block text-sm font-medium">What do you need help with?</label>
+                    <textarea
+                      id="handoff-text"
+                      rows={3}
+                      maxLength={2000}
+                      value={handoffText}
+                      onChange={(event) => setHandoffText(event.target.value)}
+                      className="min-h-11 w-full resize-y rounded-lg border border-control-line bg-transparent px-3 py-2 text-base"
+                    />
+                  </div>
+                  <p className="text-sm text-muted">Your name and email are shared with the fest team so they can help you.</p>
+                  {handoffError && <p role="alert" className="text-sm text-danger">{handoffError}</p>}
+                  <button
+                    type="submit"
+                    disabled={raising || handoff.online === null}
+                    className="min-h-11 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-40"
+                  >
+                    {raising ? "Sending…" : handoff.online ? "Connect to a moderator" : "Raise a ticket"}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 
@@ -276,14 +388,21 @@ export function Chat({ role }: { role: Role }) {
                 <ArrowUp aria-hidden className="size-5" />
               </button>
             </form>
-            <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-snug text-muted">
-              AI assistant for fest events. Your chats are saved to your account. Need a person?{" "}
-              <Link href="/tickets" className="font-medium text-accent underline underline-offset-2">
-                Raise a ticket
-              </Link>
-            </p>
+            <div className="mx-auto mt-1 flex max-w-2xl flex-wrap items-center justify-between gap-x-3">
+              <p className="text-[13px] leading-snug text-muted">AI assistant for fest events. Your chats are saved to your account.</p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => openHandoff(draft.trim() || [...messages].reverse().find((message) => message.role === "user")?.content || "")}
+                className="inline-flex min-h-11 items-center gap-2 text-[15px] font-medium text-accent disabled:opacity-40"
+              >
+                <LifeBuoy aria-hidden className="size-4" />
+                Talk to a person
+              </button>
+            </div>
           </footer>
         </div>
+        )}
       </div>
     </div>
   );

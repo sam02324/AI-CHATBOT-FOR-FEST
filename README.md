@@ -6,7 +6,7 @@ MVP for the Alliance One E-Cell x Dedal.in Product Development Challenge: an AI 
 - **Organisers (`/organiser`):** sign in and add events by typing them in, or upload up to 5 posters for Claude to read together. Organisers check the details before saving. They can also use the chat.
 
 - **Moderators:** an organiser can give someone this role on the Team page (`/organiser/team`). Moderators can manage events and tickets, but not the team.
-- **Tickets:** anyone signed in can raise a ticket at `/tickets` and gets a unique ID. Organisers and moderators reply at `/organiser/tickets`.
+- **Talking to a person:** from the chat, an attendant can reach the fest team, or the chatbot offers this when a person is needed. If a moderator or organiser has `/organiser/tickets` open, it starts a live chat. Otherwise it raises a ticket with a unique ID, and replies appear in the same conversation and under `/tickets`.
 - **Chat history:** each person's chats are saved to their account, and they can reopen or delete them.
 
 The chatbot answers only from saved events, so it says when it doesn't know something. It also screens out questions unrelated to the fest.

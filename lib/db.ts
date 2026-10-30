@@ -51,6 +51,20 @@ async function connect() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await sql.unsafe("CREATE INDEX IF NOT EXISTS tickets_user ON tickets (user_id, created_at DESC)");
+  await sql.unsafe("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS live BOOLEAN NOT NULL DEFAULT false");
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS ticket_messages (
+    id BIGSERIAL PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+    sender_role TEXT NOT NULL,
+    sender_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await sql.unsafe("CREATE INDEX IF NOT EXISTS ticket_messages_ticket ON ticket_messages (ticket_id, id)");
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS staff_presence (
+    user_id TEXT PRIMARY KEY,
+    last_seen TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
   return sql;
 }
 

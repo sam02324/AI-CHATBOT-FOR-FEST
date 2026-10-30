@@ -5,9 +5,10 @@ import { getUserId } from "@/lib/auth";
 import {
   apiErrorMessage,
   chatSystem,
+  classifyMessage,
   FALLBACK_BETA,
   getClient,
-  isOnTopic,
+  HANDOFF_MESSAGE,
   MODEL,
   NO_KEY_MESSAGE,
   OFF_TOPIC_MESSAGE,
@@ -59,9 +60,14 @@ export async function POST(request: Request) {
   const headers = { "Content-Type": "text/plain; charset=utf-8", "X-Conversation-Id": conversationId };
 
   const events = await listEvents();
-  if (!(await isOnTopic(client, messages, events))) {
+  const category = await classifyMessage(client, messages, events);
+  if (category === "off_topic") {
     await saveQuietly(conversationId, userId, question, OFF_TOPIC_MESSAGE);
     return new Response(OFF_TOPIC_MESSAGE, { headers });
+  }
+  if (category === "needs_person") {
+    await saveQuietly(conversationId, userId, question, HANDOFF_MESSAGE);
+    return new Response(HANDOFF_MESSAGE, { headers: { ...headers, "X-Chat-Action": "handoff" } });
   }
 
   const stream = client.beta.messages.stream({
