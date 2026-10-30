@@ -52,6 +52,8 @@ async function connect() {
   )`);
   await sql.unsafe("CREATE INDEX IF NOT EXISTS tickets_user ON tickets (user_id, created_at DESC)");
   await sql.unsafe("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS live BOOLEAN NOT NULL DEFAULT false");
+  await sql.unsafe("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_by TEXT NOT NULL DEFAULT ''");
+  await sql.unsafe("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ");
   await sql.unsafe(`CREATE TABLE IF NOT EXISTS ticket_messages (
     id BIGSERIAL PRIMARY KEY,
     ticket_id TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,

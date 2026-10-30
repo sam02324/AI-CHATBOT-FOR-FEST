@@ -1,5 +1,6 @@
+import { currentUser } from "@clerk/nextjs/server";
 import { jsonError, readJson } from "@/lib/api";
-import { denyUnlessStaff, getUserId } from "@/lib/auth";
+import { denyUnlessStaff } from "@/lib/auth";
 import { TICKET_STATUSES, type TicketStatus } from "@/lib/roles";
 import { deleteTicket, updateTicketStatus } from "@/lib/tickets";
 
@@ -12,7 +13,11 @@ export async function PATCH(request: Request, { params }: Context) {
   const { status } = ((await readJson(request)) ?? {}) as { status?: unknown };
   if (!TICKET_STATUSES.includes(status as TicketStatus)) return jsonError("Choose a valid status.", 400);
 
-  const ticket = await updateTicketStatus((await params).id, status as TicketStatus, (await getUserId()) ?? "");
+  const user = await currentUser();
+  if (!user) return jsonError("Please sign in.", 401);
+  const staffName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress || "Fest team";
+
+  const ticket = await updateTicketStatus((await params).id, status as TicketStatus, user.id, staffName);
   return ticket ? Response.json(ticket) : jsonError("Ticket not found.", 404);
 }
 

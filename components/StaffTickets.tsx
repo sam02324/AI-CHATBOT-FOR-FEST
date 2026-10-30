@@ -81,6 +81,12 @@ function TicketCard({ ticket, onChanged }: { ticket: Ticket; onChanged: () => vo
         )}
       </p>
       {ticket.response && <p className="mt-2 text-sm text-muted [overflow-wrap:anywhere]">Earlier reply: {ticket.response}</p>}
+      {ticket.status === "resolved" && ticket.resolved_by && (
+        <p className="mt-2 text-sm font-medium [overflow-wrap:anywhere]">
+          Resolved by {ticket.resolved_by}
+          {ticket.resolved_at && ` on ${new Date(ticket.resolved_at).toLocaleString()}`}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {ticket.status === "resolved" ? (

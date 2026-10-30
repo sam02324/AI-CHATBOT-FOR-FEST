@@ -15,11 +15,15 @@ export async function GET(_request: Request, { params }: Context) {
   const { id } = await params;
   const access = await getTicketAccess(id);
   if (!access) return jsonError("Ticket not found.", 404);
+  const messages = await listTicketMessages(id);
   if (access.ownerId !== userId) {
     const role = await getRole();
     if (!role || !isStaff(role)) return jsonError("Ticket not found.", 404);
+    return Response.json({ status: access.status, messages });
   }
-  return Response.json({ status: access.status, messages: await listTicketMessages(id) });
+  // Attendants see replies from "Fest team", so staff names aren't sent to them.
+  const visible = messages.map((message) => (message.sender_role === "staff" ? { ...message, sender_name: "" } : message));
+  return Response.json({ status: access.status, messages: visible });
 }
 
 export async function POST(request: Request, { params }: Context) {

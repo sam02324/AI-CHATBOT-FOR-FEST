@@ -5,6 +5,8 @@ import type { Ticket, TicketMessage, TicketStatus } from "./roles";
 // Leaves out letters and digits that are easy to confuse, such as O and 0.
 const ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const COLUMNS = "id, user_name, user_email, subject, description, status, response, live, created_at, updated_at";
+// Who resolved a ticket is only for staff, so attendants' queries leave these out.
+const STAFF_COLUMNS = `${COLUMNS}, resolved_by, resolved_at`;
 const SUBJECT_LENGTH = 80;
 // Staff count as online if their Tickets page checked in within this time.
 const ONLINE_WINDOW_SECONDS = 45;
@@ -44,18 +46,25 @@ export async function listOwnTickets(userId: string) {
 export async function listAllTickets() {
   const sql = await db();
   const rows = await sql.unsafe(
-    `SELECT ${COLUMNS} FROM tickets
+    `SELECT ${STAFF_COLUMNS} FROM tickets
      ORDER BY CASE WHEN status = 'resolved' THEN 3 WHEN live THEN 0 WHEN status = 'open' THEN 1 ELSE 2 END, created_at DESC
      LIMIT 200`,
   );
   return rows as unknown as Ticket[];
 }
 
-export async function updateTicketStatus(id: string, status: TicketStatus, staffId: string) {
+// Records who resolved a ticket, and clears that if it's reopened.
+export async function updateTicketStatus(id: string, status: TicketStatus, staffId: string, staffName: string) {
   const sql = await db();
   const rows = await sql.unsafe(
-    `UPDATE tickets SET status = $2, updated_by = $3, updated_at = now() WHERE id = $1 RETURNING ${COLUMNS}`,
-    [id, status, staffId],
+    `UPDATE tickets SET
+       status = $2::text,
+       updated_by = $3,
+       updated_at = now(),
+       resolved_by = CASE WHEN $2::text = 'resolved' THEN $4::text ELSE '' END,
+       resolved_at = CASE WHEN $2::text = 'resolved' THEN now() ELSE NULL END
+     WHERE id = $1 RETURNING ${STAFF_COLUMNS}`,
+    [id, status, staffId, staffName],
   );
   return (rows[0] as unknown as Ticket) ?? null;
 }

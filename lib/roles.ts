@@ -34,6 +34,9 @@ export type Ticket = {
   status: TicketStatus;
   response: string;
   live: boolean;
+  // Only included for staff.
+  resolved_by?: string;
+  resolved_at?: string | null;
   created_at: string;
   updated_at: string;
 };
