@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { jsonError, readJson } from "@/lib/api";
 import { denyUnlessSignedIn } from "@/lib/auth";
-import { apiErrorMessage, chatSystem, FALLBACK_BETA, getClient, MODEL, NO_KEY_MESSAGE } from "@/lib/claude";
+import { apiErrorMessage, chatSystem, getClient, MODEL, NO_KEY_MESSAGE } from "@/lib/claude";
 import { listEvents } from "@/lib/db";
 
 export const maxDuration = 60;
@@ -35,11 +35,9 @@ export async function POST(request: Request) {
   const client = getClient();
   if (!client) return jsonError(NO_KEY_MESSAGE, 503);
 
-  const stream = client.beta.messages.stream({
+  const stream = client.messages.stream({
     model: MODEL,
     max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
     output_config: { effort: "low" },
     system: chatSystem(await listEvents()),
     messages,

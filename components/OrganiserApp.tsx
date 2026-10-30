@@ -58,23 +58,24 @@ const SECTIONS: { title: string; fields: FieldConfig[] }[] = [
 const inputClass =
   "min-h-11 w-full rounded-lg border bg-transparent px-3 py-2 text-base placeholder:text-muted";
 
-// Phone photos can be very large, so shrink them before sending.
-function shrinkImage(file: File): Promise<string> {
+const MAX_POSTERS = 5;
+// Keeps all posters together under Vercel's request size limit of about 4.5 MB.
+const MAX_POSTER_DATA_URL_LENGTH = 800_000;
+const SHRINK_STEPS = [
+  { side: 2000, quality: 0.85 },
+  { side: 2000, quality: 0.7 },
+  { side: 1600, quality: 0.7 },
+  { side: 1200, quality: 0.7 },
+  { side: 1000, quality: 0.6 },
+];
+
+function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
-      const scale = Math.min(1, 2000 / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(image.width * scale);
-      canvas.height = Math.round(image.height * scale);
-      const context = canvas.getContext("2d");
-      if (!context) return reject(new Error("no canvas"));
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(image);
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -82,6 +83,26 @@ function shrinkImage(file: File): Promise<string> {
     };
     image.src = url;
   });
+}
+
+// Phone photos can be very large, so shrink them until they fit before sending.
+async function shrinkImage(file: File) {
+  const image = await loadImage(file);
+  let dataUrl = "";
+  for (const { side, quality } of SHRINK_STEPS) {
+    const scale = Math.min(1, side / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(image.width * scale);
+    canvas.height = Math.round(image.height * scale);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("no canvas");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    dataUrl = canvas.toDataURL("image/jpeg", quality);
+    if (dataUrl.length <= MAX_POSTER_DATA_URL_LENGTH) break;
+  }
+  return dataUrl;
 }
 
 async function errorFrom(response: Response) {
@@ -101,7 +122,9 @@ export function OrganiserApp() {
   const [uncertain, setUncertain] = useState<EventField[]>([]);
   const [addedSections, setAddedSections] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [poster, setPoster] = useState("");
+  const [posters, setPosters] = useState<string[]>([]);
+  const [extracted, setExtracted] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [posterError, setPosterError] = useState("");
@@ -135,7 +158,8 @@ export function OrganiserApp() {
     setUncertain([]);
     setAddedSections(0);
     setEditingId(null);
-    setPoster("");
+    setPosters([]);
+    setExtracted(false);
     setPosterError("");
     setNameError("");
     setFormError("");
@@ -143,25 +167,42 @@ export function OrganiserApp() {
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  async function readPoster(file: File | undefined) {
-    if (!file) return;
+  async function addPosters(files: File[]) {
+    if (files.length === 0) return;
     setPosterError("");
     setSaved("");
-    if (!file.type.startsWith("image/")) {
-      setPosterError("Please choose an image file, such as a JPG or PNG.");
+    if (files.some((file) => !file.type.startsWith("image/"))) {
+      setPosterError("Please choose image files, such as JPG or PNG.");
       return;
     }
+    const room = MAX_POSTERS - posters.length;
+    if (files.length > room) {
+      setPosterError(`You can add up to ${MAX_POSTERS} posters for one event.`);
+      return;
+    }
+    setAdding(true);
+    try {
+      const added = await Promise.all(files.map(shrinkImage));
+      setPosters((current) => [...current, ...added]);
+    } catch {
+      setPosterError("Couldn't open that image. Try a different file, or enter the details manually.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function readPosters() {
+    setPosterError("");
     setReading(true);
     try {
-      const dataUrl = await shrinkImage(file);
-      setPoster(dataUrl);
       const response = await fetch("/api/extract", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ image: dataUrl.split(",")[1], mediaType: "image/jpeg" }),
+        body: JSON.stringify({
+          images: posters.map((poster) => ({ data: poster.split(",")[1], mediaType: "image/jpeg" })),
+        }),
       });
       if (!response.ok) {
-        setPoster("");
         setPosterError(await errorFrom(response));
         return;
       }
@@ -180,9 +221,9 @@ export function OrganiserApp() {
       setDetails(next);
       setUncertain([...flagged]);
       setAddedSections(data.custom_sections.length);
+      setExtracted(true);
     } catch {
-      setPoster("");
-      setPosterError("Couldn't open that image. Try a different file, or enter the details manually.");
+      setPosterError("Couldn't reach the server. Please try again.");
     } finally {
       setReading(false);
     }
@@ -191,7 +232,7 @@ export function OrganiserApp() {
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     setDragging(false);
-    if (!reading) readPoster(event.dataTransfer.files[0]);
+    if (!reading && !adding) addPosters([...event.dataTransfer.files]);
   }
 
   function setField(field: EventField, value: string) {
@@ -266,7 +307,8 @@ export function OrganiserApp() {
     }
   }
 
-  const showForm = mode === "manual" || Boolean(poster && !reading);
+  const showForm = mode === "manual" || extracted;
+  const posterWord = posters.length === 1 ? "poster" : "posters";
 
   return (
     <div className="min-h-dvh pb-12">
@@ -305,7 +347,7 @@ export function OrganiserApp() {
                   mode === option ? "bg-surface shadow-sm" : "text-muted"
                 }`}
               >
-                {option === "poster" ? "From a poster" : "Enter manually"}
+                {option === "poster" ? "From posters" : "Enter manually"}
               </button>
             ))}
           </div>
@@ -315,7 +357,7 @@ export function OrganiserApp() {
           <p role="status" className="rounded-xl bg-accent-soft p-3 text-[15px]">{saved}</p>
         )}
 
-        {mode === "poster" && !poster && (
+        {mode === "poster" && !extracted && (
           <div>
             <label
               htmlFor="poster"
@@ -330,37 +372,83 @@ export function OrganiserApp() {
               }`}
             >
               <ImageUp aria-hidden className="size-8 text-accent" />
-              <span className="mt-3 text-lg font-medium">Drop a poster here, or choose a file</span>
+              <span className="mt-3 text-lg font-medium">Drop posters here, or choose files</span>
               <span className="mt-1 max-w-md text-[15px] text-muted">
-                Claude reads the poster and fills in the details for you to check. The image is sent to Anthropic for
-                this. Nothing is saved until you press Save.
+                Add up to {MAX_POSTERS} posters for one event. Claude reads them together and fills in the details for
+                you to check. The images are sent to Anthropic for this. Nothing is saved until you press Save.
               </span>
               <input
                 ref={fileInput}
                 id="poster"
                 type="file"
+                multiple
                 accept="image/jpeg,image/png,image/webp,image/gif"
-                disabled={reading}
-                onChange={(event) => readPoster(event.target.files?.[0])}
-                className="sr-only"
-              />
-            </label>
-            {/* Only shown on touch devices, where capture opens the camera directly. */}
-            <label className="mt-3 hidden min-h-11 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent pointer-coarse:flex">
-              <Camera aria-hidden className="size-5" />
-              Take a photo of the poster
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                disabled={reading}
+                disabled={reading || adding}
                 onChange={(event) => {
-                  readPoster(event.target.files?.[0]);
+                  addPosters([...(event.target.files ?? [])]);
                   event.target.value = "";
                 }}
                 className="sr-only"
               />
             </label>
+            {/* Only shown on touch devices, where capture opens the camera directly. */}
+            <label className="mt-3 hidden min-h-11 w-full items-center justify-center gap-2 rounded-full border border-control-line px-6 font-medium transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent pointer-coarse:flex">
+              <Camera aria-hidden className="size-5" />
+              {posters.length > 0 ? "Take another photo" : "Take a photo of the poster"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={reading || adding}
+                onChange={(event) => {
+                  addPosters([...(event.target.files ?? [])]);
+                  event.target.value = "";
+                }}
+                className="sr-only"
+              />
+            </label>
+
+            {posters.length > 0 && (
+              <div className="mt-4 rounded-2xl bg-surface p-4">
+                <p className="text-[15px] font-semibold">
+                  {posters.length} {posterWord} added
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-3">
+                  {posters.map((poster, index) => (
+                    <li key={index} className="w-28">
+                      {/* A local data URL from the organiser's own file, so next/image doesn't apply. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={poster} alt={`Poster ${index + 1}`} className="h-36 w-28 rounded-lg border border-line object-cover" />
+                      <button
+                        type="button"
+                        disabled={reading}
+                        aria-label={`Remove poster ${index + 1}`}
+                        onClick={() => setPosters((current) => current.filter((_, i) => i !== index))}
+                        className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-[15px] font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-40"
+                      >
+                        <Trash2 aria-hidden className="size-4" />
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  disabled={reading || adding}
+                  onClick={readPosters}
+                  className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-40"
+                >
+                  {reading && <LoaderCircle aria-hidden className="size-5 animate-spin" />}
+                  {reading ? `Reading ${posterWord}…` : `Read ${posters.length} ${posterWord} with Claude`}
+                </button>
+                {reading && (
+                  <p role="status" className="mt-2 text-sm text-muted">
+                    This can take a few seconds.
+                  </p>
+                )}
+              </div>
+            )}
+
             {posterError && (
               <p role="alert" className="mt-3 flex items-start gap-2 text-[15px] text-danger">
                 <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
@@ -370,36 +458,38 @@ export function OrganiserApp() {
           </div>
         )}
 
-        {reading && poster && (
-          <div role="status" className="flex items-center gap-3 rounded-2xl bg-surface p-6">
-            <LoaderCircle aria-hidden className="size-5 animate-spin text-accent" />
-            <span>Reading the poster. This can take a few seconds.</span>
-          </div>
-        )}
-
         {showForm && (
-          <div className={poster ? "grid items-start gap-6 lg:grid-cols-[280px_1fr]" : ""}>
-            {poster && (
+          <div className={extracted ? "grid items-start gap-6 lg:grid-cols-[280px_1fr]" : ""}>
+            {extracted && (
               <figure className="lg:sticky lg:top-4">
-                {/* A local data URL from the organiser's own file, so next/image doesn't apply. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={poster} alt="The poster you uploaded" className="max-h-96 w-auto rounded-xl border border-line lg:max-h-[80vh]" />
+                <div className="flex gap-3 overflow-x-auto lg:max-h-[75vh] lg:flex-col lg:overflow-x-visible lg:overflow-y-auto">
+                  {posters.map((poster, index) => (
+                    // A local data URL from the organiser's own file, so next/image doesn't apply.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={index}
+                      src={poster}
+                      alt={`Poster ${index + 1} of ${posters.length}`}
+                      className="max-h-96 w-auto shrink-0 rounded-xl border border-line lg:max-h-none lg:w-full"
+                    />
+                  ))}
+                </div>
                 <figcaption className="mt-2 text-sm text-muted">
-                  Compare this with the details before saving.
+                  Compare {posters.length === 1 ? "this" : "these"} with the details before saving.
                   {" "}
                   <button
                     type="button"
                     onClick={() => resetForm("poster")}
                     className="font-medium text-accent underline underline-offset-4"
                   >
-                    Use a different poster
+                    Use different posters
                   </button>
                 </figcaption>
               </figure>
             )}
 
             <form onSubmit={save} noValidate className="space-y-6">
-              {poster && (
+              {extracted && (
                 <p className="flex items-start gap-2 rounded-xl border border-check-line bg-check-soft p-3 text-[15px] text-check">
                   <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
                   {uncertain.length > 0

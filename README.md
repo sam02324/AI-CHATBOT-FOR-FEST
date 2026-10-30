@@ -3,7 +3,7 @@
 MVP for the Alliance One E-Cell x Dedal.in Product Development Challenge: an AI chatbot that answers attendants' questions about fest events.
 
 - **Attendants (`/chat`):** sign in and ask about events, timings, venues and registration.
-- **Organisers (`/organiser`):** sign in and add events by typing them in, or upload a poster for Claude to read. Organisers check the details before saving. They can also use the chat.
+- **Organisers (`/organiser`):** sign in and add events by typing them in, or upload up to 5 posters for Claude to read together. Organisers check the details before saving. They can also use the chat.
 
 The chatbot answers only from saved events, so it says when it doesn't know something.
 
@@ -26,7 +26,7 @@ Everyone who signs up is an attendant. To make someone an organiser:
 
 ## Built with
 
-Next.js, React, TypeScript, Tailwind CSS, Postgres (Neon or Supabase), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-opus-5-5`).
+Next.js, React, TypeScript, Tailwind CSS, Postgres (Neon or Supabase), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-haiku-5-5`).
 
 Clerk stores the names and email addresses of people who sign up.
 
