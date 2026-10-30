@@ -26,7 +26,7 @@ Everyone who signs up is an attendant. To make someone an organiser:
 
 ## Built with
 
-Next.js, React, TypeScript, Tailwind CSS, Postgres (Neon or Supabase), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-haiku-5-5`).
+Next.js, React, TypeScript, Tailwind CSS, Postgres (Neon or Supabase), Vercel for hosting, Lucide icons, Clerk for login and the Claude API (`claude-sonnet-5-5`).
 
 Clerk stores the names and email addresses of people who sign up.
 
