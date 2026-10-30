@@ -18,9 +18,12 @@ export const EVENT_FIELDS = [
 ] as const;
 
 export type EventField = (typeof EVENT_FIELDS)[number];
-export type EventDetails = Record<EventField, string>;
+// A heading and details the organiser adds themselves, such as "Rules" or "Judging".
+export type CustomSection = { title: string; content: string };
+export type EventDetails = Record<EventField, string> & { custom_sections: CustomSection[] };
 export type FestEvent = EventDetails & { id: string };
 
-export const EMPTY_EVENT = Object.fromEntries(
-  EVENT_FIELDS.map((field) => [field, ""]),
-) as EventDetails;
+export const EMPTY_EVENT = {
+  ...Object.fromEntries(EVENT_FIELDS.map((field) => [field, ""])),
+  custom_sections: [],
+} as unknown as EventDetails;

@@ -1,10 +1,17 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { Camera, CircleAlert, ImageUp, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { Camera, CircleAlert, ImageUp, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { EMPTY_EVENT, EVENT_FIELDS, type EventDetails, type EventField, type FestEvent } from "@/lib/event-fields";
+import {
+  EMPTY_EVENT,
+  EVENT_FIELDS,
+  type CustomSection,
+  type EventDetails,
+  type EventField,
+  type FestEvent,
+} from "@/lib/event-fields";
 
 type Mode = "poster" | "manual";
 
@@ -156,10 +163,14 @@ export function OrganiserApp() {
         setPosterError(await errorFrom(response));
         return;
       }
-      const data = (await response.json()) as Partial<Record<EventField, string | null>> & { uncertain_fields: string[] };
+      const data = (await response.json()) as Partial<Record<EventField, string | null>> & {
+        custom_sections: CustomSection[];
+        uncertain_fields: string[];
+      };
       const next = { ...EMPTY_EVENT };
       const flagged = new Set(data.uncertain_fields.filter((f): f is EventField => EVENT_FIELDS.includes(f as EventField)));
       for (const field of EVENT_FIELDS) next[field] = data[field] ?? "";
+      next.custom_sections = data.custom_sections;
       if (next.date && !/^\d{4}-\d{2}-\d{2}$/.test(next.date)) {
         next.date = "";
         flagged.add("date");
@@ -186,6 +197,14 @@ export function OrganiserApp() {
     if (field === "name") setNameError("");
   }
 
+  function setSections(sections: CustomSection[]) {
+    setDetails((current) => ({ ...current, custom_sections: sections }));
+  }
+
+  function updateSection(index: number, change: Partial<CustomSection>) {
+    setSections(details.custom_sections.map((section, i) => (i === index ? { ...section, ...change } : section)));
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault();
     setFormError("");
@@ -193,6 +212,11 @@ export function OrganiserApp() {
     if (!details.name.trim()) {
       setNameError("Enter the event name.");
       nameInput.current?.focus();
+      return;
+    }
+    const incomplete = details.custom_sections.findIndex((section) => !section.title.trim() !== !section.content.trim());
+    if (incomplete !== -1) {
+      setFormError(`Section ${incomplete + 1} needs both a heading and details, or remove it.`);
       return;
     }
     try {
@@ -427,6 +451,63 @@ export function OrganiserApp() {
                   </div>
                 </fieldset>
               ))}
+
+              <fieldset className="rounded-2xl bg-surface p-4 sm:p-5">
+                <legend className="float-left w-full text-[15px] font-semibold">Extra sections</legend>
+                <p className="clear-both mb-3 text-sm text-muted">
+                  Add anything else attendants might ask about, such as rules, judging or a schedule.
+                </p>
+                <div className="space-y-4">
+                  {details.custom_sections.map((section, index) => (
+                    <div key={index} className="space-y-3 rounded-xl border border-line p-3">
+                      <div>
+                        <label htmlFor={`section-title-${index}`} className="mb-1 block text-sm font-medium">
+                          Section {index + 1} heading
+                        </label>
+                        <input
+                          id={`section-title-${index}`}
+                          value={section.title}
+                          maxLength={100}
+                          placeholder="Rules"
+                          onChange={(event) => updateSection(index, { title: event.target.value })}
+                          className={`${inputClass} border-control-line`}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`section-content-${index}`} className="mb-1 block text-sm font-medium">
+                          Section {index + 1} details
+                        </label>
+                        <textarea
+                          id={`section-content-${index}`}
+                          rows={3}
+                          value={section.content}
+                          maxLength={5000}
+                          onChange={(event) => updateSection(index, { content: event.target.value })}
+                          className={`${inputClass} border-control-line resize-y`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSections(details.custom_sections.filter((_, i) => i !== index))}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-[15px] font-medium text-danger transition-colors hover:bg-danger-soft"
+                      >
+                        <Trash2 aria-hidden className="size-4" />
+                        Remove section {index + 1}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {details.custom_sections.length < 20 && (
+                  <button
+                    type="button"
+                    onClick={() => setSections([...details.custom_sections, { title: "", content: "" }])}
+                    className={`${details.custom_sections.length > 0 ? "mt-4 " : ""}inline-flex min-h-11 items-center gap-2 rounded-full border border-control-line px-4 text-[15px] font-medium transition-colors hover:bg-accent-soft`}
+                  >
+                    <Plus aria-hidden className="size-4" />
+                    Add a section
+                  </button>
+                )}
+              </fieldset>
 
               {formError && (
                 <p role="alert" className="flex items-start gap-2 text-[15px] text-danger">

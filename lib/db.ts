@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { EVENT_FIELDS, type EventDetails, type FestEvent } from "./event-fields";
 
-// Column names only ever come from the fixed EVENT_FIELDS list; values are always bound parameters.
-const COLUMNS = EVENT_FIELDS.join(", ");
-const PLACEHOLDERS = EVENT_FIELDS.map((_, index) => `$${index + 2}`).join(", ");
-const ASSIGNMENTS = EVENT_FIELDS.map((field, index) => `${field} = $${index + 2}`).join(", ");
+// Column names only ever come from this fixed list; values are always bound parameters.
+const STORED_FIELDS = [...EVENT_FIELDS, "custom_sections"];
+const COLUMNS = STORED_FIELDS.join(", ");
+const PLACEHOLDERS = STORED_FIELDS.map((_, index) => `$${index + 2}`).join(", ");
+const ASSIGNMENTS = STORED_FIELDS.map((field, index) => `${field} = $${index + 2}`).join(", ");
 
 let database: Promise<postgres.Sql> | undefined;
 
@@ -15,9 +16,11 @@ async function connect() {
   if (!url) throw new Error("DATABASE_URL is not set.");
   const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
   // One connection per serverless instance, and no prepared statements so connection poolers work.
-  const sql = postgres(url, { max: 1, prepare: false, ssl: isLocal ? false : "require" });
+  const sql = postgres(url, { max: 1, prepare: false, ssl: isLocal ? false : "require", onnotice: () => {} });
   const columnDefinitions = EVENT_FIELDS.map((field) => `${field} TEXT NOT NULL DEFAULT ''`).join(", ");
   await sql.unsafe(`CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, ${columnDefinitions})`);
+  // Adds the column to tables created before custom sections existed.
+  await sql.unsafe("ALTER TABLE events ADD COLUMN IF NOT EXISTS custom_sections TEXT NOT NULL DEFAULT '[]'");
   return sql;
 }
 
@@ -30,13 +33,13 @@ function db() {
 }
 
 function values(details: EventDetails) {
-  return EVENT_FIELDS.map((field) => details[field]);
+  return [...EVENT_FIELDS.map((field) => details[field]), JSON.stringify(details.custom_sections)];
 }
 
 export async function listEvents() {
   const sql = await db();
   const rows = await sql.unsafe(`SELECT id, ${COLUMNS} FROM events ORDER BY date, start_time, name`);
-  return rows.map((row) => ({ ...row })) as unknown as FestEvent[];
+  return rows.map((row) => ({ ...row, custom_sections: JSON.parse(row.custom_sections) })) as unknown as FestEvent[];
 }
 
 export async function createEvent(details: EventDetails): Promise<FestEvent> {
