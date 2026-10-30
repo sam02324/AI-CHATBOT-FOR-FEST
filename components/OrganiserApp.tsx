@@ -99,6 +99,7 @@ export function OrganiserApp() {
   const [mode, setMode] = useState<Mode>("poster");
   const [details, setDetails] = useState<EventDetails>(EMPTY_EVENT);
   const [uncertain, setUncertain] = useState<EventField[]>([]);
+  const [addedSections, setAddedSections] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [poster, setPoster] = useState("");
   const [reading, setReading] = useState(false);
@@ -132,6 +133,7 @@ export function OrganiserApp() {
   function resetForm(nextMode: Mode = mode) {
     setDetails(EMPTY_EVENT);
     setUncertain([]);
+    setAddedSections(0);
     setEditingId(null);
     setPoster("");
     setPosterError("");
@@ -177,6 +179,7 @@ export function OrganiserApp() {
       }
       setDetails(next);
       setUncertain([...flagged]);
+      setAddedSections(data.custom_sections.length);
     } catch {
       setPoster("");
       setPosterError("Couldn't open that image. Try a different file, or enter the details manually.");
@@ -402,6 +405,8 @@ export function OrganiserApp() {
                   {uncertain.length > 0
                     ? `Claude wasn't sure about ${uncertain.length === 1 ? "1 detail" : `${uncertain.length} details`}, marked "Check this". Review everything before saving.`
                     : "Claude can make mistakes, so review everything before saving."}
+                  {addedSections > 0 &&
+                    ` It also added ${addedSections === 1 ? "1 extra section" : `${addedSections} extra sections`} further down, which you can edit or remove.`}
                 </p>
               )}
 

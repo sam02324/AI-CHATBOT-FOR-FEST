@@ -44,7 +44,7 @@ Copy the event's details into the fields, using only what the poster shows. Use 
 - is_event_poster: false if this isn't an event poster.
 - date: YYYY-MM-DD. If the poster has no year, use the next time that date occurs.
 - start_time and end_time: as printed, for example "10:00 AM".
-- custom_sections: other labelled information that doesn't fit a field, such as rules or judging criteria, as a short heading and its details.
+- custom_sections: create a section for any information an attendant might ask about that doesn't fit a field, such as rules, judging criteria, rounds, a schedule or sponsors. Use the poster's heading if it has one; otherwise write a short heading yourself. Details must come only from the poster.
 - notes: any other useful detail that doesn't fit a field or section.
 - uncertain_fields: names of fields that were hard to read or that you inferred, such as a date with no year on the poster.
 
