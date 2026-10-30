@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { jsonError, readJson } from "@/lib/api";
-import { denyUnlessSignedIn } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
 import {
   apiErrorMessage,
   chatSystem,
@@ -11,42 +12,56 @@ import {
   NO_KEY_MESSAGE,
   OFF_TOPIC_MESSAGE,
 } from "@/lib/claude";
+import { getMessages, saveExchange } from "@/lib/conversations";
 import { listEvents } from "@/lib/db";
 
 export const maxDuration = 60;
 
-const MAX_MESSAGES = 20;
+const MAX_CONTEXT_MESSAGES = 19;
 const MAX_MESSAGE_LENGTH = 2000;
 
-function validMessages(messages: unknown): messages is Anthropic.MessageParam[] {
-  return (
-    Array.isArray(messages) &&
-    messages.length > 0 &&
-    messages.length <= MAX_MESSAGES &&
-    messages.at(-1)?.role === "user" &&
-    messages.every(
-      (message) =>
-        ["user", "assistant"].includes(message?.role) &&
-        typeof message.content === "string" &&
-        message.content.length > 0 &&
-        message.content.length <= MAX_MESSAGE_LENGTH,
-    )
-  );
+// Sends recent messages, always starting on a user's message.
+function contextFrom(history: Anthropic.MessageParam[], question: string): Anthropic.MessageParam[] {
+  const recent = history.slice(-MAX_CONTEXT_MESSAGES + 1);
+  if (recent[0]?.role === "assistant") recent.shift();
+  return [...recent, { role: "user", content: question }];
+}
+
+async function saveQuietly(conversationId: string, userId: string, question: string, answer: string) {
+  try {
+    await saveExchange(conversationId, userId, question, answer);
+  } catch (error) {
+    console.error("Couldn't save chat history", error);
+  }
 }
 
 export async function POST(request: Request) {
-  const denied = await denyUnlessSignedIn();
-  if (denied) return denied;
+  const userId = await getUserId();
+  if (!userId) return jsonError("Please sign in.", 401);
 
-  const { messages } = ((await readJson(request)) ?? {}) as { messages?: unknown };
-  if (!validMessages(messages)) return jsonError("Invalid message.", 400);
+  const body = ((await readJson(request)) ?? {}) as { conversationId?: unknown; message?: unknown };
+  const question = typeof body.message === "string" ? body.message.trim() : "";
+  if (!question || question.length > MAX_MESSAGE_LENGTH) return jsonError("Invalid message.", 400);
 
   const client = getClient();
   if (!client) return jsonError(NO_KEY_MESSAGE, 503);
 
+  // History always comes from the database, so a request can't invent earlier messages.
+  let conversationId: string = randomUUID();
+  let history: Anthropic.MessageParam[] = [];
+  if (typeof body.conversationId === "string") {
+    const saved = await getMessages(body.conversationId, userId);
+    if (!saved) return jsonError("Conversation not found.", 404);
+    conversationId = body.conversationId;
+    history = saved;
+  }
+  const messages = contextFrom(history, question);
+  const headers = { "Content-Type": "text/plain; charset=utf-8", "X-Conversation-Id": conversationId };
+
   const events = await listEvents();
   if (!(await isOnTopic(client, messages, events))) {
-    return new Response(OFF_TOPIC_MESSAGE, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    await saveQuietly(conversationId, userId, question, OFF_TOPIC_MESSAGE);
+    return new Response(OFF_TOPIC_MESSAGE, { headers });
   }
 
   const stream = client.beta.messages.stream({
@@ -70,31 +85,35 @@ export async function POST(request: Request) {
   }
 
   const encoder = new TextEncoder();
-  const body = new ReadableStream<Uint8Array>({
+  let cancelled = false;
+  const responseBody = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let wroteText = false;
+      let answer = "";
+      const write = (text: string) => {
+        answer += text;
+        if (!cancelled) controller.enqueue(encoder.encode(text));
+      };
       try {
         for (let result = first; !result.done; result = await streamEvents.next()) {
           const event = result.value;
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text));
-            wroteText = true;
-          }
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") write(event.delta.text);
         }
         const final = await stream.finalMessage();
-        if (final.stop_reason === "refusal" && !wroteText) {
-          controller.enqueue(encoder.encode("Sorry, I can't help with that. Please ask an event coordinator."));
+        if (final.stop_reason === "refusal" && !answer) {
+          write("Sorry, I can't help with that. Please ask an event coordinator.");
         }
+        if (answer) await saveQuietly(conversationId, userId, question, answer);
       } catch (error) {
         console.error(error);
-        controller.enqueue(encoder.encode(`\n\n${apiErrorMessage(error)}`));
+        if (!cancelled) controller.enqueue(encoder.encode(`\n\n${apiErrorMessage(error)}`));
       }
-      controller.close();
+      if (!cancelled) controller.close();
     },
     cancel() {
+      cancelled = true;
       stream.abort();
     },
   });
 
-  return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  return new Response(responseBody, { headers });
 }

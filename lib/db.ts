@@ -21,10 +21,40 @@ async function connect() {
   await sql.unsafe(`CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, ${columnDefinitions})`);
   // Adds the column to tables created before custom sections existed.
   await sql.unsafe("ALTER TABLE events ADD COLUMN IF NOT EXISTS custom_sections TEXT NOT NULL DEFAULT '[]'");
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await sql.unsafe("CREATE INDEX IF NOT EXISTS conversations_user ON conversations (user_id, updated_at DESC)");
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS chat_messages (
+    id BIGSERIAL PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations (id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await sql.unsafe("CREATE INDEX IF NOT EXISTS chat_messages_conversation ON chat_messages (conversation_id, id)");
+  await sql.unsafe(`CREATE TABLE IF NOT EXISTS tickets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    response TEXT NOT NULL DEFAULT '',
+    updated_by TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await sql.unsafe("CREATE INDEX IF NOT EXISTS tickets_user ON tickets (user_id, created_at DESC)");
   return sql;
 }
 
-function db() {
+export function db() {
   database ??= connect().catch((error) => {
     database = undefined;
     throw error;

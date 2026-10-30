@@ -1,11 +1,11 @@
 import { cleanEvent, jsonError, readJson } from "@/lib/api";
-import { denyUnlessOrganiser } from "@/lib/auth";
+import { denyUnlessStaff } from "@/lib/auth";
 import { deleteEvent, updateEvent } from "@/lib/db";
 
 type Context = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, { params }: Context) {
-  const denied = await denyUnlessOrganiser();
+  const denied = await denyUnlessStaff();
   if (denied) return denied;
 
   const details = cleanEvent(await readJson(request));
@@ -15,7 +15,7 @@ export async function PUT(request: Request, { params }: Context) {
 }
 
 export async function DELETE(request: Request, { params }: Context) {
-  const denied = await denyUnlessOrganiser();
+  const denied = await denyUnlessStaff();
   if (denied) return denied;
 
   const deleted = await deleteEvent((await params).id);

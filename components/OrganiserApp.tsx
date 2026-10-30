@@ -1,9 +1,9 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import { Camera, CircleAlert, ImageUp, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { AppHeader } from "@/components/AppHeader";
+import type { Role } from "@/lib/roles";
 import {
   EMPTY_EVENT,
   EVENT_FIELDS,
@@ -116,7 +116,7 @@ function formatEventLine(event: FestEvent) {
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-export function OrganiserApp() {
+export function OrganiserApp({ role }: { role: Role }) {
   const [mode, setMode] = useState<Mode>("poster");
   const [details, setDetails] = useState<EventDetails>(EMPTY_EVENT);
   const [uncertain, setUncertain] = useState<EventField[]>([]);
@@ -312,23 +312,13 @@ export function OrganiserApp() {
 
   return (
     <div className="min-h-dvh pb-12">
-      <header className="border-b border-line bg-surface px-4 py-3">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <h1 className="text-[17px] font-semibold">Fest Organiser</h1>
-          <div className="flex items-center gap-4">
-            <Link href="/chat" className="flex min-h-11 items-center text-[15px] font-medium text-accent underline-offset-4 hover:underline">
-              Open chat
-            </Link>
-            <UserButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader role={role} />
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 pt-8">
         <div>
-          <h2 ref={formTop} className="scroll-mt-4 text-3xl font-semibold tracking-tight">
+          <h1 ref={formTop} className="scroll-mt-4 text-3xl font-semibold tracking-tight">
             {editingId ? "Edit event" : "Add an event"}
-          </h2>
+          </h1>
           <p className="mt-2 text-muted">Attendants can ask the chatbot about any event you save here.</p>
         </div>
 
