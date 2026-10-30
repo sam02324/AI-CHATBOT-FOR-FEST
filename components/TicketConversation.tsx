@@ -9,6 +9,7 @@ const POLL_MS = 4000;
 // The messages between an attendant and the fest team on one ticket. Staff see the same thread.
 export function TicketConversation({ ticketId, viewer }: { ticketId: string; viewer: "attendant" | "staff" }) {
   const [thread, setThread] = useState<TicketThread | null>(null);
+  const [removed, setRemoved] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -18,6 +19,7 @@ export function TicketConversation({ ticketId, viewer }: { ticketId: string; vie
   const load = useCallback(async () => {
     const response = await fetch(`/api/tickets/${ticketId}/messages`).catch(() => null);
     if (response?.ok) setThread(await response.json());
+    if (response?.status === 404) setRemoved(true);
   }, [ticketId]);
 
   useEffect(() => {
@@ -59,6 +61,8 @@ export function TicketConversation({ ticketId, viewer }: { ticketId: string; vie
   }
 
   const closed = viewer === "attendant" && thread?.status === "resolved";
+
+  if (removed) return <p className="py-2 text-sm text-muted">This ticket has been deleted by the fest team.</p>;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -60,6 +60,13 @@ export async function updateTicketStatus(id: string, status: TicketStatus, staff
   return (rows[0] as unknown as Ticket) ?? null;
 }
 
+// The ticket's messages are deleted with it.
+export async function deleteTicket(id: string) {
+  const sql = await db();
+  const result = await sql`DELETE FROM tickets WHERE id = ${id}`;
+  return result.count > 0;
+}
+
 // Returns who owns a ticket and its status, or null if it doesn't exist.
 export async function getTicketAccess(id: string) {
   const sql = await db();
