@@ -494,7 +494,7 @@ export function OrganiserApp() {
                   <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
                   {uncertain.length > 0
                     ? `The AI wasn't sure about ${uncertain.length === 1 ? "1 detail" : `${uncertain.length} details`}, marked "Check this". Review everything before saving.`
-                    : "AI can make mistakes, so review everything before saving."}
+                    : "Extraction can make mistakes, so review everything before saving."}
                   {addedSections > 0 &&
                     ` It also added ${addedSections === 1 ? "1 extra section" : `${addedSections} extra sections`} further down, which you can edit or remove.`}
                 </p>
