@@ -6,7 +6,6 @@ import {
   apiErrorMessage,
   chatSystem,
   classifyMessage,
-  FALLBACK_BETA,
   getClient,
   HANDOFF_MESSAGE,
   MODEL,
@@ -70,11 +69,9 @@ export async function POST(request: Request) {
     return new Response(HANDOFF_MESSAGE, { headers: { ...headers, "X-Chat-Action": "handoff" } });
   }
 
-  const stream = client.beta.messages.stream({
+  const stream = client.messages.stream({
     model: MODEL,
     max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
     output_config: { effort: "low" },
     system: chatSystem(events),
     messages,

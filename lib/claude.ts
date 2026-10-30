@@ -3,15 +3,12 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { FestEvent } from "./event-fields";
 
+// The only model this app uses, for chat, poster reading and message screening.
 export const MODEL = "claude-sonnet-5-5";
-// If Claude's safety filter declines a request, the API retries it on another model.
-export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 export const NO_KEY_MESSAGE = "No API key set. Add ANTHROPIC_API_KEY to .env.local and restart.";
 export const OFF_TOPIC_MESSAGE = "I can only help with questions about the fest and its events. What would you like to know?";
 export const HANDOFF_MESSAGE = "That sounds like something a person from the fest team should help with. You can reach them below.";
 export type MessageCategory = "question" | "needs_person" | "off_topic";
-// Screening runs on every chat message and is a simple yes or no, so it uses the fastest model.
-const CLASSIFIER_MODEL = "claude-haiku-5-5";
 const CLASSIFIER_CONTEXT_MESSAGES = 6;
 
 export function getClient() {
@@ -109,7 +106,7 @@ export async function classifyMessage(
 ): Promise<MessageCategory> {
   try {
     const response = await client.messages.parse({
-      model: CLASSIFIER_MODEL,
+      model: MODEL,
       max_tokens: 1024,
       output_config: { effort: "low", format: zodOutputFormat(CategorySchema) },
       system: classifierSystem(events),

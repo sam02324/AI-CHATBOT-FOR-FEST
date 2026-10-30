@@ -1,7 +1,7 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { jsonError, readJson } from "@/lib/api";
 import { denyUnlessStaff } from "@/lib/auth";
-import { apiErrorMessage, FALLBACK_BETA, getClient, MODEL, NO_KEY_MESSAGE, PosterSchema, posterPrompt } from "@/lib/claude";
+import { apiErrorMessage, getClient, MODEL, NO_KEY_MESSAGE, PosterSchema, posterPrompt } from "@/lib/claude";
 
 export const maxDuration = 60;
 
@@ -35,11 +35,9 @@ export async function POST(request: Request) {
   if (!client) return jsonError(NO_KEY_MESSAGE, 503);
 
   try {
-    const response = await client.beta.messages.parse({
+    const response = await client.messages.parse({
       model: MODEL,
       max_tokens: 16000,
-      betas: [FALLBACK_BETA],
-      fallbacks: "default",
       output_config: { effort: "medium", format: zodOutputFormat(PosterSchema) },
       messages: [{ role: "user", content: [...content, { type: "text", text: posterPrompt(images.length) }] }],
     });
