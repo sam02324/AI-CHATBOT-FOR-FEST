@@ -1,0 +1,22 @@
+import { checkPin, cleanEvent, jsonError, readJson } from "@/lib/api";
+import { deleteEvent, updateEvent } from "@/lib/db";
+
+type Context = { params: Promise<{ id: string }> };
+
+export async function PUT(request: Request, { params }: Context) {
+  const denied = checkPin(request);
+  if (denied) return denied;
+
+  const details = cleanEvent(await readJson(request));
+  if (!details.name) return jsonError("Event name is required.", 400);
+  const updated = updateEvent((await params).id, details);
+  return updated ? Response.json(updated) : jsonError("Event not found.", 404);
+}
+
+export async function DELETE(request: Request, { params }: Context) {
+  const denied = checkPin(request);
+  if (denied) return denied;
+
+  const deleted = deleteEvent((await params).id);
+  return deleted ? new Response(null, { status: 204 }) : jsonError("Event not found.", 404);
+}

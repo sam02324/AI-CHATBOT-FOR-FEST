@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* Void black: the app's only theme. */
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --surface: #0c0c0e;
+  --ink: #f5f5f7;
+  --muted: #a6a6ad;
+  --line: #26262a;
+  --control-line: #7a7a82;
+  --accent: #ff6a2b;
+  --accent-hover: #ff8652;
+  --on-accent: #000000;
+  --accent-soft: #2a1206;
+  --check: #ffd479;
+  --check-soft: #241b05;
+  --check-line: #b88a24;
+  --danger: #ff8f8f;
+  --danger-soft: #2a0d0d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-control-line: var(--control-line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-check: var(--check);
+  --color-check-soft: var(--check-soft);
+  --color-check-line: var(--check-line);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button:not(:disabled),
+label[for] {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes typing {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.typing-dot {
+  animation: typing 1.2s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .typing-dot {
+    opacity: 0.6;
+  }
+}
