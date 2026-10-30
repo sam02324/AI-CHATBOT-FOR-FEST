@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { CircleAlert, ImageUp, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { Camera, CircleAlert, ImageUp, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { EMPTY_EVENT, EVENT_FIELDS, type EventDetails, type EventField, type FestEvent } from "@/lib/event-fields";
@@ -315,6 +315,22 @@ export function OrganiserApp() {
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 disabled={reading}
                 onChange={(event) => readPoster(event.target.files?.[0])}
+                className="sr-only"
+              />
+            </label>
+            {/* Only shown on touch devices, where capture opens the camera directly. */}
+            <label className="mt-3 hidden min-h-11 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent pointer-coarse:flex">
+              <Camera aria-hidden className="size-5" />
+              Take a photo of the poster
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={reading}
+                onChange={(event) => {
+                  readPoster(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
                 className="sr-only"
               />
             </label>
