@@ -172,8 +172,7 @@ export function Chat({ canManageEvents }: { canManageEvents: boolean }) {
           </button>
         </form>
         <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-snug text-muted">
-          AI assistant. It answers from events added by organisers and can make mistakes, so check important details
-          with a coordinator.
+          AI assistant for fest events.
         </p>
       </footer>
     </div>
