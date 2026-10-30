@@ -374,8 +374,8 @@ export function OrganiserApp() {
               <ImageUp aria-hidden className="size-8 text-accent" />
               <span className="mt-3 text-lg font-medium">Drop posters here, or choose files</span>
               <span className="mt-1 max-w-md text-[15px] text-muted">
-                Add up to {MAX_POSTERS} posters for one event. Claude reads them together and fills in the details for
-                you to check. The images are sent to Anthropic for this. Nothing is saved until you press Save.
+                Add up to {MAX_POSTERS} posters for one event. AI reads them together and fills in the details for you
+                to check. The images are sent to an AI service for this. Nothing is saved until you press Save.
               </span>
               <input
                 ref={fileInput}
@@ -439,7 +439,7 @@ export function OrganiserApp() {
                   className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-40"
                 >
                   {reading && <LoaderCircle aria-hidden className="size-5 animate-spin" />}
-                  {reading ? `Reading ${posterWord}…` : `Read ${posters.length} ${posterWord} with Claude`}
+                  {reading ? `Reading ${posterWord}…` : `Read ${posters.length} ${posterWord} with AI`}
                 </button>
                 {reading && (
                   <p role="status" className="mt-2 text-sm text-muted">
@@ -493,8 +493,8 @@ export function OrganiserApp() {
                 <p className="flex items-start gap-2 rounded-xl border border-check-line bg-check-soft p-3 text-[15px] text-check">
                   <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
                   {uncertain.length > 0
-                    ? `Claude wasn't sure about ${uncertain.length === 1 ? "1 detail" : `${uncertain.length} details`}, marked "Check this". Review everything before saving.`
-                    : "Claude can make mistakes, so review everything before saving."}
+                    ? `The AI wasn't sure about ${uncertain.length === 1 ? "1 detail" : `${uncertain.length} details`}, marked "Check this". Review everything before saving.`
+                    : "AI can make mistakes, so review everything before saving."}
                   {addedSections > 0 &&
                     ` It also added ${addedSections === 1 ? "1 extra section" : `${addedSections} extra sections`} further down, which you can edit or remove.`}
                 </p>
