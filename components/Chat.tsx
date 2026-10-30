@@ -1,6 +1,8 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
 import { ArrowUp, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -8,7 +10,7 @@ type Message = { role: "user" | "assistant"; content: string };
 const MAX_HISTORY = 20;
 const SUGGESTIONS = ["What events are happening?", "How do I register?", "Which events have prizes?"];
 
-export function Chat() {
+export function Chat({ canManageEvents }: { canManageEvents: boolean }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,8 +73,16 @@ export function Chat() {
   return (
     <div className="flex h-dvh flex-col">
       <header className="border-b border-line bg-surface px-4 py-3">
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto flex min-h-11 max-w-2xl items-center justify-between gap-4">
           <h1 className="text-[17px] font-semibold">Fest Help</h1>
+          <div className="flex items-center gap-4">
+            {canManageEvents && (
+              <Link href="/organiser" className="flex min-h-11 items-center text-[15px] font-medium text-accent underline-offset-4 hover:underline">
+                Manage events
+              </Link>
+            )}
+            <UserButton />
+          </div>
         </div>
       </header>
 

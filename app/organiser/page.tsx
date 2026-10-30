@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { OrganiserApp } from "@/components/OrganiserApp";
+import { getRole } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Fest Organiser" };
 
-// Read the PIN setting on each request, not at build time.
-export const dynamic = "force-dynamic";
-
-export default function OrganiserPage() {
-  return <OrganiserApp pinRequired={Boolean(process.env.ORGANISER_PIN)} />;
+export default async function OrganiserPage() {
+  const role = await getRole();
+  if (!role) redirect("/sign-in");
+  if (role !== "organiser") redirect("/chat");
+  return <OrganiserApp />;
 }

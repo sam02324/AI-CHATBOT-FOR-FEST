@@ -1,13 +1,16 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { checkPin, jsonError, readJson } from "@/lib/api";
+import { jsonError, readJson } from "@/lib/api";
+import { denyUnlessOrganiser } from "@/lib/auth";
 import { apiErrorMessage, FALLBACK_BETA, getClient, MODEL, NO_KEY_MESSAGE, PosterSchema, posterPrompt } from "@/lib/claude";
+
+export const maxDuration = 60;
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 const MAX_IMAGE_BASE64_LENGTH = 5 * 1024 * 1024;
 
 // Reads a poster and returns the fields for the organiser to check. Nothing is saved here.
 export async function POST(request: Request) {
-  const denied = checkPin(request);
+  const denied = await denyUnlessOrganiser();
   if (denied) return denied;
 
   const { image, mediaType } = ((await readJson(request)) ?? {}) as { image?: unknown; mediaType?: unknown };

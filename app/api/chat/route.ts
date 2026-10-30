@@ -1,7 +1,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { jsonError, readJson } from "@/lib/api";
+import { denyUnlessSignedIn } from "@/lib/auth";
 import { apiErrorMessage, chatSystem, FALLBACK_BETA, getClient, MODEL, NO_KEY_MESSAGE } from "@/lib/claude";
 import { listEvents } from "@/lib/db";
+
+export const maxDuration = 60;
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -23,6 +26,9 @@ function validMessages(messages: unknown): messages is Anthropic.MessageParam[] 
 }
 
 export async function POST(request: Request) {
+  const denied = await denyUnlessSignedIn();
+  if (denied) return denied;
+
   const { messages } = ((await readJson(request)) ?? {}) as { messages?: unknown };
   if (!validMessages(messages)) return jsonError("Invalid message.", 400);
 
@@ -35,7 +41,7 @@ export async function POST(request: Request) {
     betas: [FALLBACK_BETA],
     fallbacks: "default",
     output_config: { effort: "low" },
-    system: chatSystem(listEvents()),
+    system: chatSystem(await listEvents()),
     messages,
   });
 

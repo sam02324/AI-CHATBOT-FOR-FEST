@@ -1,5 +1,6 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
 import { CircleAlert, ImageUp, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
@@ -85,8 +86,9 @@ function formatEventLine(event: FestEvent) {
   return [event.date, event.start_time, event.venue].filter(Boolean).join(" · ") || "No date or venue yet";
 }
 
-export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
-  const [pin, setPin] = useState("");
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+export function OrganiserApp() {
   const [mode, setMode] = useState<Mode>("poster");
   const [details, setDetails] = useState<EventDetails>(EMPTY_EVENT);
   const [uncertain, setUncertain] = useState<EventField[]>([]);
@@ -120,10 +122,6 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
     loadEvents();
   }, []);
 
-  function headers() {
-    return { "Content-Type": "application/json", "x-organiser-pin": pin };
-  }
-
   function resetForm(nextMode: Mode = mode) {
     setDetails(EMPTY_EVENT);
     setUncertain([]);
@@ -150,7 +148,7 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
       setPoster(dataUrl);
       const response = await fetch("/api/extract", {
         method: "POST",
-        headers: headers(),
+        headers: JSON_HEADERS,
         body: JSON.stringify({ image: dataUrl.split(",")[1], mediaType: "image/jpeg" }),
       });
       if (!response.ok) {
@@ -200,7 +198,7 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
     try {
       const response = await fetch(editingId ? `/api/events/${editingId}` : "/api/events", {
         method: editingId ? "PUT" : "POST",
-        headers: headers(),
+        headers: JSON_HEADERS,
         body: JSON.stringify(details),
       });
       if (!response.ok) {
@@ -229,7 +227,7 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
     if (!confirm(`Delete "${item.name}"? The chatbot will stop answering questions about it.`)) return;
     setListError("");
     try {
-      const response = await fetch(`/api/events/${item.id}`, { method: "DELETE", headers: headers() });
+      const response = await fetch(`/api/events/${item.id}`, { method: "DELETE" });
       if (!response.ok) {
         setListError(await errorFrom(response));
         return;
@@ -248,9 +246,12 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
       <header className="border-b border-line bg-surface px-4 py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <h1 className="text-[17px] font-semibold">Fest Organiser</h1>
-          <Link href="/" className="flex min-h-11 items-center text-[15px] font-medium text-accent underline-offset-4 hover:underline">
-            Open student chat
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/chat" className="flex min-h-11 items-center text-[15px] font-medium text-accent underline-offset-4 hover:underline">
+              Open chat
+            </Link>
+            <UserButton />
+          </div>
         </div>
       </header>
 
@@ -259,22 +260,8 @@ export function OrganiserApp({ pinRequired }: { pinRequired: boolean }) {
           <h2 ref={formTop} className="scroll-mt-4 text-3xl font-semibold tracking-tight">
             {editingId ? "Edit event" : "Add an event"}
           </h2>
-          <p className="mt-2 text-muted">Students can ask the chatbot about any event you save here.</p>
+          <p className="mt-2 text-muted">Attendants can ask the chatbot about any event you save here.</p>
         </div>
-
-        {pinRequired && (
-          <div className="max-w-xs">
-            <label htmlFor="pin" className="mb-1 block text-sm font-medium">Organiser PIN</label>
-            <input
-              id="pin"
-              type="password"
-              autoComplete="off"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              className={`${inputClass} border-control-line`}
-            />
-          </div>
-        )}
 
         {!editingId && (
           <div role="group" aria-label="How to add the event" className="inline-flex rounded-xl bg-line p-1">
