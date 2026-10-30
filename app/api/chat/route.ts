@@ -60,10 +60,10 @@ export async function POST(request: Request) {
   });
 
   // Wait for the first event, so a bad key or outage returns a real error status.
-  const events = stream[Symbol.asyncIterator]();
-  let first: Awaited<ReturnType<typeof events.next>>;
+  const streamEvents = stream[Symbol.asyncIterator]();
+  let first: Awaited<ReturnType<typeof streamEvents.next>>;
   try {
-    first = await events.next();
+    first = await streamEvents.next();
   } catch (error) {
     console.error(error);
     return jsonError(apiErrorMessage(error), 502);
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     async start(controller) {
       let wroteText = false;
       try {
-        for (let result = first; !result.done; result = await events.next()) {
+        for (let result = first; !result.done; result = await streamEvents.next()) {
           const event = result.value;
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             controller.enqueue(encoder.encode(event.delta.text));
