@@ -130,6 +130,7 @@ export function OrganiserApp({ role }: { role: Role }) {
   const [posterError, setPosterError] = useState("");
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState("");
   const [events, setEvents] = useState<FestEvent[] | null>(null);
   const [listError, setListError] = useState("");
@@ -251,6 +252,7 @@ export function OrganiserApp({ role }: { role: Role }) {
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (saving) return;
     setFormError("");
     setSaved("");
     if (!details.name.trim()) {
@@ -263,6 +265,7 @@ export function OrganiserApp({ role }: { role: Role }) {
       setFormError(`Section ${incomplete + 1} needs both a heading and details, or remove it.`);
       return;
     }
+    setSaving(true);
     try {
       const response = await fetch(editingId ? `/api/events/${editingId}` : "/api/events", {
         method: editingId ? "PUT" : "POST",
@@ -279,6 +282,8 @@ export function OrganiserApp({ role }: { role: Role }) {
       loadEvents();
     } catch {
       setFormError("Couldn't reach the server. Your details are still here, so please try again.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -607,9 +612,10 @@ export function OrganiserApp({ role }: { role: Role }) {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  className="min-h-11 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors hover:bg-accent-hover"
+                  disabled={saving}
+                  className="min-h-11 rounded-full bg-accent px-6 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-40"
                 >
-                  {editingId ? "Save changes" : "Save event"}
+                  {saving ? "Saving…" : editingId ? "Save changes" : "Save event"}
                 </button>
                 <button
                   type="button"

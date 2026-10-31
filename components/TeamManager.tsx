@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ROLE_LABELS, type Role, type TeamMember } from "@/lib/roles";
@@ -61,6 +62,9 @@ export function TeamManager({ role }: { role: Role }) {
           <p className="mt-2 text-muted">
             Moderators can add events and handle tickets. People need to sign up before they appear here.
           </p>
+          <Link href="/organiser/errors" className="inline-flex min-h-11 items-center text-[15px] text-accent underline underline-offset-2">
+            View error log
+          </Link>
         </div>
 
         <form onSubmit={submitSearch} className="flex gap-2">

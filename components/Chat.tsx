@@ -3,7 +3,10 @@
 import { ArrowLeft, ArrowUp, History, LifeBuoy, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { ChatAnswer } from "@/components/ChatAnswer";
 import { TicketConversation } from "@/components/TicketConversation";
+import { parseAnswer } from "@/lib/chat-format";
+import type { EventCard } from "@/lib/event-fields";
 import type { ChatMessage, ConversationSummary, Role, Ticket } from "@/lib/roles";
 
 const SUGGESTIONS = ["What events are happening?", "How do I register?", "Which events have prizes?"];
@@ -12,6 +15,7 @@ export function Chat({ role }: { role: Role }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [cards, setCards] = useState<EventCard[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,28 +25,42 @@ export function Chat({ role }: { role: Role }) {
   const [handoff, setHandoff] = useState<{ online: boolean | null } | null>(null);
   const [handoffText, setHandoffText] = useState("");
   const [handoffError, setHandoffError] = useState("");
+  const [includeChat, setIncludeChat] = useState(true);
   const [raising, setRaising] = useState(false);
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  // Only true when there's a saved chat to share.
+  const sharingChat = includeChat && Boolean(conversationId);
 
   const loadConversations = useCallback(async () => {
     const response = await fetch("/api/conversations").catch(() => null);
     if (response?.ok) setConversations(await response.json());
   }, []);
 
+  // A failed load just means answers show without cards.
+  const loadCards = useCallback(async () => {
+    try {
+      const response = await fetch("/api/events/cards");
+      if (response.ok) setCards(await response.json());
+    } catch {}
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations();
-  }, [loadConversations]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCards();
+  }, [loadConversations, loadCards]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [messages, busy, error, handoff]);
+  }, [messages, cards, busy, error, handoff]);
 
   async function openHandoff(text: string) {
     setHandoffText(text);
     setHandoffError("");
+    setIncludeChat(true);
     setHandoff({ online: null });
     const response = await fetch("/api/presence").catch(() => null);
     const body = response?.ok ? await response.json() : { online: false };
@@ -61,7 +79,7 @@ export function Chat({ role }: { role: Role }) {
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: handoffText }),
+        body: JSON.stringify({ description: handoffText, conversationId: sharingChat ? conversationId : undefined }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Something went wrong. Please try again.");
@@ -99,6 +117,8 @@ export function Chat({ role }: { role: Role }) {
       if (!answer) throw new Error("No answer came back. Please try again.");
       setConversationId(response.headers.get("X-Conversation-Id"));
       loadConversations();
+      // An unknown ref may be an event added since the cards loaded. Each answer reloads at most once.
+      if (parseAnswer(answer).refs.some((ref) => !cards.some((card) => card.ref === ref))) loadCards();
       if (response.headers.get("X-Chat-Action") === "handoff") openHandoff(question);
     } catch (caught) {
       setMessages(shown);
@@ -294,9 +314,7 @@ export function Chat({ role }: { role: Role }) {
                         {message.content}
                       </p>
                     ) : (
-                      <p key={index} className="max-w-[92%] leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
-                        {message.content}
-                      </p>
+                      <ChatAnswer key={index} content={message.content} cards={cards} />
                     ),
                   )}
                   {waiting && (
@@ -353,7 +371,23 @@ export function Chat({ role }: { role: Role }) {
                       className="min-h-11 w-full resize-y rounded-lg border border-control-line bg-transparent px-3 py-2 text-base"
                     />
                   </div>
-                  <p className="text-sm text-muted">Your name and email are shared with the fest team so they can help you.</p>
+                  {conversationId && (
+                    <label htmlFor="handoff-include-chat" className="flex min-h-11 items-center gap-3 text-[15px]">
+                      <input
+                        id="handoff-include-chat"
+                        type="checkbox"
+                        checked={includeChat}
+                        onChange={(event) => setIncludeChat(event.target.checked)}
+                        className="size-5 shrink-0 accent-accent"
+                      />
+                      Include this chat so you don&apos;t have to repeat yourself
+                    </label>
+                  )}
+                  <p className="text-sm text-muted">
+                    {sharingChat
+                      ? "Your name, email and this chat are shared with the fest team so they can help you."
+                      : "Your name and email are shared with the fest team so they can help you."}
+                  </p>
                   {handoffError && <p role="alert" className="text-sm text-danger">{handoffError}</p>}
                   <button
                     type="submit"

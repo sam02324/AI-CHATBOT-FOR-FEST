@@ -1,7 +1,9 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { jsonError, readJson } from "@/lib/api";
-import { denyUnlessStaff } from "@/lib/auth";
+import { denyUnlessStaff, getUserId } from "@/lib/auth";
 import { apiErrorMessage, getClient, MODEL, NO_KEY_MESSAGE, PosterSchema, posterPrompt } from "@/lib/claude";
+import { logError } from "@/lib/errors";
+import { enforceAiLimits, LIMITS } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -34,13 +36,21 @@ export async function POST(request: Request) {
   const client = getClient();
   if (!client) return jsonError(NO_KEY_MESSAGE, 503);
 
+  const userId = await getUserId();
+  if (!userId) return jsonError("Please sign in.", 401);
+  const limited = await enforceAiLimits(userId, LIMITS.poster);
+  if (limited) return limited;
+
   try {
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 16000,
-      output_config: { effort: "medium", format: zodOutputFormat(PosterSchema) },
-      messages: [{ role: "user", content: [...content, { type: "text", text: posterPrompt(images.length) }] }],
-    });
+    const response = await client.messages.parse(
+      {
+        model: MODEL,
+        max_tokens: 16000,
+        output_config: { effort: "medium", format: zodOutputFormat(PosterSchema) },
+        messages: [{ role: "user", content: [...content, { type: "text", text: posterPrompt(images.length) }] }],
+      },
+      { timeout: 50_000, maxRetries: 0, signal: AbortSignal.timeout(50_000) },
+    );
     if (response.stop_reason === "refusal" || !response.parsed_output) {
       return jsonError("Couldn't read that. Please enter the details manually.", 422);
     }
@@ -52,7 +62,7 @@ export async function POST(request: Request) {
     }
     return Response.json(response.parsed_output);
   } catch (error) {
-    console.error(error);
+    await logError("poster", error);
     return jsonError(apiErrorMessage(error), 502);
   }
 }

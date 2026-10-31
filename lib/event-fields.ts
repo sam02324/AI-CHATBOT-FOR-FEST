@@ -23,6 +23,17 @@ export type CustomSection = { title: string; content: string };
 export type EventDetails = Record<EventField, string> & { custom_sections: CustomSection[] };
 export type FestEvent = EventDetails & { id: string };
 
+// What the chat needs to show an event as a card.
+export type EventCard = Pick<
+  EventDetails,
+  "name" | "category" | "date" | "start_time" | "end_time" | "venue" | "fee" | "registration_link"
+> & { ref: string };
+
+// A short, stable reference for an event, so the AI can point at one without the full ID.
+export function eventRef(id: string) {
+  return id.slice(0, 8);
+}
+
 export const EMPTY_EVENT = {
   ...Object.fromEntries(EVENT_FIELDS.map((field) => [field, ""])),
   custom_sections: [],

@@ -1,7 +1,8 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { jsonError, readJson } from "@/lib/api";
 import { getRole, getUserId } from "@/lib/auth";
-import { isStaff } from "@/lib/roles";
+import { enforceLimits, LIMITS } from "@/lib/rate-limit";
+import { isStaff, roleFromMetadata } from "@/lib/roles";
 import { addTicketMessage, getTicketAccess, listTicketMessages } from "@/lib/tickets";
 
 type Context = { params: Promise<{ id: string }> };
@@ -15,12 +16,15 @@ export async function GET(_request: Request, { params }: Context) {
   const { id } = await params;
   const access = await getTicketAccess(id);
   if (!access) return jsonError("Ticket not found.", 404);
-  const messages = await listTicketMessages(id);
-  if (access.ownerId !== userId) {
+
+  const owner = access.ownerId === userId;
+  if (!owner) {
     const role = await getRole();
     if (!role || !isStaff(role)) return jsonError("Ticket not found.", 404);
-    return Response.json({ status: access.status, messages });
   }
+
+  const messages = await listTicketMessages(id);
+  if (!owner) return Response.json({ status: access.status, messages });
   // Attendants see replies from "Fest team", so staff names aren't sent to them.
   const visible = messages.map((message) => (message.sender_role === "staff" ? { ...message, sender_name: "" } : message));
   return Response.json({ status: access.status, messages: visible });
@@ -34,8 +38,7 @@ export async function POST(request: Request, { params }: Context) {
   const access = await getTicketAccess(id);
   if (!access) return jsonError("Ticket not found.", 404);
 
-  const role = await getRole();
-  const staff = role !== null && isStaff(role);
+  const staff = isStaff(roleFromMetadata(user.publicMetadata));
   const owner = access.ownerId === user.id;
   if (!staff && !owner) return jsonError("Ticket not found.", 404);
   if (!staff && access.status === "resolved") return jsonError("This ticket is resolved.", 409);
@@ -43,6 +46,9 @@ export async function POST(request: Request, { params }: Context) {
   const { content } = ((await readJson(request)) ?? {}) as { content?: unknown };
   const clean = typeof content === "string" ? content.trim().slice(0, 2000) : "";
   if (!clean) return jsonError("Enter a message.", 400);
+
+  const limited = await enforceLimits(user.id, LIMITS.ticketMessage);
+  if (limited) return limited;
 
   // If staff raised this ticket themselves, their replies still count as the attendant's side.
   await addTicketMessage(id, owner ? "attendant" : "staff", user.fullName || user.username || "", clean);

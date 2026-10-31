@@ -12,30 +12,28 @@ import {
   NO_KEY_MESSAGE,
   OFF_TOPIC_MESSAGE,
 } from "@/lib/claude";
-import { getMessages, saveExchange } from "@/lib/conversations";
+import { getRecentMessages, saveExchange } from "@/lib/conversations";
 import { listEvents } from "@/lib/db";
+import { logError } from "@/lib/errors";
+import { enforceAiLimits, LIMITS } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
 const MAX_CONTEXT_MESSAGES = 19;
 const MAX_MESSAGE_LENGTH = 2000;
-
-// Sends recent messages, always starting on a user's message.
-function contextFrom(history: Anthropic.MessageParam[], question: string): Anthropic.MessageParam[] {
-  const recent = history.slice(-MAX_CONTEXT_MESSAGES + 1);
-  if (recent[0]?.role === "assistant") recent.shift();
-  return [...recent, { role: "user", content: question }];
-}
+// Vercel stops this function at maxDuration, so the answer is given up on while there's still time to say so.
+const ANSWER_DEADLINE_MS = 50_000;
 
 async function saveQuietly(conversationId: string, userId: string, question: string, answer: string) {
   try {
     await saveExchange(conversationId, userId, question, answer);
   } catch (error) {
-    console.error("Couldn't save chat history", error);
+    await logError("chat-history", error);
   }
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const userId = await getUserId();
   if (!userId) return jsonError("Please sign in.", 401);
 
@@ -46,16 +44,21 @@ export async function POST(request: Request) {
   const client = getClient();
   if (!client) return jsonError(NO_KEY_MESSAGE, 503);
 
+  const limited = await enforceAiLimits(userId, LIMITS.chat);
+  if (limited) return limited;
+
   // History always comes from the database, so a request can't invent earlier messages.
+  // An ID with no messages starts a new chat. It may never have saved, been deleted, or be someone else's.
   let conversationId: string = randomUUID();
   let history: Anthropic.MessageParam[] = [];
   if (typeof body.conversationId === "string") {
-    const saved = await getMessages(body.conversationId, userId);
-    if (!saved) return jsonError("Conversation not found.", 404);
-    conversationId = body.conversationId;
-    history = saved;
+    const saved = await getRecentMessages(body.conversationId, userId, MAX_CONTEXT_MESSAGES - 1);
+    if (saved.length > 0) {
+      conversationId = body.conversationId;
+      history = saved;
+    }
   }
-  const messages = contextFrom(history, question);
+  const messages: Anthropic.MessageParam[] = [...history, { role: "user", content: question }];
   const headers = { "Content-Type": "text/plain; charset=utf-8", "X-Conversation-Id": conversationId };
 
   const events = await listEvents();
@@ -76,6 +79,7 @@ export async function POST(request: Request) {
     system: chatSystem(events),
     messages,
   });
+  const deadline = setTimeout(() => stream.abort(), startedAt + ANSWER_DEADLINE_MS - Date.now());
 
   // Wait for the first event, so a bad key or outage returns a real error status.
   const streamEvents = stream[Symbol.asyncIterator]();
@@ -83,7 +87,8 @@ export async function POST(request: Request) {
   try {
     first = await streamEvents.next();
   } catch (error) {
-    console.error(error);
+    clearTimeout(deadline);
+    await logError("chat", error);
     return jsonError(apiErrorMessage(error), 502);
   }
 
@@ -106,11 +111,17 @@ export async function POST(request: Request) {
           write("Sorry, I can't help with that. Please ask an event coordinator.");
         }
         if (answer) await saveQuietly(conversationId, userId, question, answer);
+        if (!cancelled) controller.close();
       } catch (error) {
-        console.error(error);
-        if (!cancelled) controller.enqueue(encoder.encode(`\n\n${apiErrorMessage(error)}`));
+        // Failing the stream makes the page drop the partial answer and offer Try again.
+        // The error is recorded first, because the function can stop as soon as the response ends.
+        if (!cancelled) {
+          await logError("chat", error);
+          controller.error(error);
+        }
+      } finally {
+        clearTimeout(deadline);
       }
-      if (!cancelled) controller.close();
     },
     cancel() {
       cancelled = true;

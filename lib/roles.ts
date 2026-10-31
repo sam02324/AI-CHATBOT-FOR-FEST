@@ -37,6 +37,7 @@ export type Ticket = {
   // Only included for staff.
   resolved_by?: string;
   resolved_at?: string | null;
+  transcript_count?: number;
   created_at: string;
   updated_at: string;
 };
@@ -50,6 +51,9 @@ export type TicketMessage = {
 };
 
 export type TicketThread = { status: TicketStatus; messages: TicketMessage[] };
+
+// One page of the staff ticket list, with the total for each status.
+export type TicketPage = { tickets: Ticket[]; counts: Record<TicketStatus, number> };
 
 export type ConversationSummary = { id: string; title: string; updated_at: string };
 export type ChatMessage = { role: "user" | "assistant"; content: string };
