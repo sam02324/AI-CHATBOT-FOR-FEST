@@ -28,6 +28,24 @@ export async function closeDb() {
   database = undefined;
 }
 
+// Postgres rejects text with a NUL character, so an ID containing one can't match anything.
+export function isStorable(text: string) {
+  return !text.includes("\0");
+}
+
+// Times are stored as printed, such as "9:00 AM". Anything else goes after them on the same day.
+function minutesIntoDay(time: string) {
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(time.replaceAll(".", "").trim());
+  if (!match) return 24 * 60;
+  const hour = Number(match[1]) % (match[3] ? 12 : 24) + (match[3]?.toLowerCase() === "pm" ? 12 : 0);
+  return hour * 60 + Number(match[2] ?? 0);
+}
+
+function byDateAndTime(a: FestEvent, b: FestEvent) {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  return minutesIntoDay(a.start_time) - minutesIntoDay(b.start_time);
+}
+
 function values(details: EventDetails) {
   return [...EVENT_FIELDS.map((field) => details[field]), JSON.stringify(details.custom_sections)];
 }
@@ -35,7 +53,9 @@ function values(details: EventDetails) {
 export async function listEvents() {
   const sql = db();
   const rows = await sql.unsafe(`SELECT id, ${COLUMNS} FROM events ORDER BY date, start_time, name, id`);
-  return rows.map((row) => ({ ...row, custom_sections: JSON.parse(row.custom_sections) })) as unknown as FestEvent[];
+  const events = rows.map((row) => ({ ...row, custom_sections: JSON.parse(row.custom_sections) })) as unknown as FestEvent[];
+  // The sort keeps the query's order for ties, so the order never changes between requests. The prompt is cached.
+  return events.sort(byDateAndTime);
 }
 
 export async function createEvent(details: EventDetails): Promise<FestEvent> {
@@ -46,12 +66,14 @@ export async function createEvent(details: EventDetails): Promise<FestEvent> {
 }
 
 export async function updateEvent(id: string, details: EventDetails): Promise<FestEvent | null> {
+  if (!isStorable(id)) return null;
   const sql = db();
   const result = await sql.unsafe(`UPDATE events SET ${ASSIGNMENTS} WHERE id = $1`, [id, ...values(details)]);
   return result.count === 0 ? null : { id, ...details };
 }
 
 export async function deleteEvent(id: string) {
+  if (!isStorable(id)) return false;
   const sql = db();
   const result = await sql.unsafe("DELETE FROM events WHERE id = $1", [id]);
   return result.count > 0;

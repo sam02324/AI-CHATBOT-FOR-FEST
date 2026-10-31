@@ -19,10 +19,10 @@ export type LoggedError = {
 // Writes to the server logs and to the error_log table organisers can read.
 // It never throws, so recording an error can't cause a second one.
 export async function logError(source: string, error: unknown, details: ErrorDetails = {}) {
-  console.error(`[${source}]`, error);
-  const message = (error instanceof Error ? error.message : String(error)).slice(0, MESSAGE_LENGTH);
-  const stack = (error instanceof Error ? (error.stack ?? "") : "").slice(0, STACK_LENGTH);
   try {
+    console.error(`[${source}]`, error);
+    const message = String(error instanceof Error ? error.message : error).slice(0, MESSAGE_LENGTH);
+    const stack = String(error instanceof Error ? (error.stack ?? "") : "").slice(0, STACK_LENGTH);
     const sql = db();
     await sql`
       INSERT INTO error_log (source, message, stack, digest, path)

@@ -23,7 +23,6 @@ export function TicketConversation({ ticketId, viewer }: { ticketId: string; vie
   }, [ticketId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") load();

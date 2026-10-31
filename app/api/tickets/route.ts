@@ -1,5 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { jsonError, readJson } from "@/lib/api";
+import { cleanText, jsonError, readJson } from "@/lib/api";
 import { getRole, getUserId } from "@/lib/auth";
 import { parseAnswer } from "@/lib/chat-format";
 import { getRecentMessages } from "@/lib/conversations";
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     description?: unknown;
     conversationId?: unknown;
   };
-  const cleanDescription = typeof description === "string" ? description.trim().slice(0, 2000) : "";
+  const cleanDescription = cleanText(description, 2000);
   if (!cleanDescription) return jsonError("Tell us what you need help with.", 400);
 
   const limited = await enforceLimits(user.id, LIMITS.ticket);

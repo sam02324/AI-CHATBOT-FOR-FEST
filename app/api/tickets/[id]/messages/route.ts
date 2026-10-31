@@ -1,5 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { jsonError, readJson } from "@/lib/api";
+import { cleanText, jsonError, readJson } from "@/lib/api";
 import { getRole, getUserId } from "@/lib/auth";
 import { enforceLimits, LIMITS } from "@/lib/rate-limit";
 import { isStaff, roleFromMetadata } from "@/lib/roles";
@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: Context) {
   if (!staff && access.status === "resolved") return jsonError("This ticket is resolved.", 409);
 
   const { content } = ((await readJson(request)) ?? {}) as { content?: unknown };
-  const clean = typeof content === "string" ? content.trim().slice(0, 2000) : "";
+  const clean = cleanText(content, 2000);
   if (!clean) return jsonError("Enter a message.", 400);
 
   const limited = await enforceLimits(user.id, LIMITS.ticketMessage);

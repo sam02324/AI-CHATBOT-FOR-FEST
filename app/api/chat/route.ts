@@ -107,7 +107,9 @@ export async function POST(request: Request) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") write(event.delta.text);
         }
         const final = await stream.finalMessage();
-        if (final.stop_reason === "refusal" && !answer) {
+        if (final.stop_reason === "refusal") {
+          // Text sent before a refusal is unfinished, so it's dropped rather than saved as an answer.
+          if (answer) throw new Error("The answer was refused partway through.");
           write("Sorry, I can't help with that. Please ask an event coordinator.");
         }
         if (answer) await saveQuietly(conversationId, userId, question, answer);

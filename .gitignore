@@ -1,7 +1,16 @@
+# Dependencies and build output
 node_modules/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Secrets: every env file stays local, except the empty example
 .env
-.env.local
-data/
+.env.*
+!.env.example
+*.pem
+.vercel/
+
+# Local tools
+.claude/
+AGENTS.md

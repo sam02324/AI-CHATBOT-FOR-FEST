@@ -739,25 +739,23 @@ describe("tricky text", () => {
     expect(row.transcript_count).toBe(0);
   });
 
-  // Postgres can't store a NUL character in text, and these routes don't check for it.
-  // In production these requests fail with a 500 instead of being cleaned or refused.
   describe("text containing a NUL character", () => {
     const NUL = "before\u0000after";
 
-    knownBug("BUG: raising a ticket gives a clean response", async () => {
+    test("raising a ticket gives a clean response", async () => {
       signInAs("attendant");
       const response = await raiseTicket({ description: NUL });
       expect([201, 400]).toContain(response.status);
     });
 
-    knownBug("BUG: posting a ticket message gives a clean response", async () => {
+    test("posting a ticket message gives a clean response", async () => {
       const { id: userId } = signInAs("attendant");
       const id = await seedTicket({ userId });
       const response = await postTo(id, NUL);
       expect([201, 400]).toContain(response.status);
     });
 
-    knownBug("BUG: reading a ticket with such an ID gives 404", async () => {
+    test("reading a ticket with such an ID gives 404", async () => {
       signInAs("attendant");
       const response = await getMessages(request("/api/tickets/x/messages"), withId(NUL));
       expect(response.status).toBe(404);

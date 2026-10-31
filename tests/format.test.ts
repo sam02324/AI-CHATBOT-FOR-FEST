@@ -4,7 +4,6 @@ import { formatEventDate, parseAnswer, safeLink, splitLinks } from "@/lib/chat-f
 import { apiErrorMessage, chatSystem, eventsForPrompt, festDate, posterPrompt } from "@/lib/claude";
 import { EMPTY_EVENT, eventRef, type FestEvent } from "@/lib/event-fields";
 import { cleanEvent } from "@/lib/api";
-import { knownBug } from "./helpers/known-bug";
 
 function festEvent(details: Partial<FestEvent> = {}): FestEvent {
   return { ...EMPTY_EVENT, id: "a1b2c3d4-0000-4000-8000-000000000000", name: "Hackathon", ...details };
@@ -86,7 +85,7 @@ describe("parseAnswer", () => {
       }
     });
 
-    knownBug("BUG: a marker split across two lines is hidden while it arrives", () => {
+    test("a marker split across two lines is hidden while it arrives", () => {
       const { text } = parseAnswer("Hello [[events:\n a1");
       expect(text).toBe("Hello");
     });
@@ -139,8 +138,7 @@ describe("safeLink", () => {
     expect(safeLink(value)).toBeNull();
   });
 
-  // An organiser who types one of these as the registration link gets a Register button that goes nowhere.
-  knownBug.each([["N.A"], ["10.30"], ["1.5"]])("BUG: isn't fooled by text that only looks like a domain: %j", (value) => {
+  test.each([["N.A"], ["10.30"], ["1.5"]])("isn't fooled by text that only looks like a domain: %j", (value) => {
     expect(safeLink(value)).toBeNull();
   });
 });
@@ -222,8 +220,7 @@ describe("formatEventDate", () => {
     expect(formatEventDate(date)).toBe(date);
   });
 
-  // new Date() rolls 30 February over to 2 March, so the card shows a different date from the stored one.
-  knownBug("BUG: leaves a date that doesn't exist as it is", () => {
+  test("leaves a date that doesn't exist as it is", () => {
     expect(formatEventDate("2026-02-30")).toBe("2026-02-30");
   });
 });

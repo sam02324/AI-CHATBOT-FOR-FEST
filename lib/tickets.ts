@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { db } from "./db";
+import { db, isStorable } from "./db";
 import { TICKET_STATUSES, type ChatMessage, type Ticket, type TicketMessage, type TicketStatus } from "./roles";
 
 // Leaves out letters and digits that are easy to confuse, such as O and 0.
@@ -71,6 +71,7 @@ export async function countTicketsByStatus() {
 
 // The chat a ticket came from, or null if the ticket doesn't exist.
 export async function getTicketTranscript(id: string) {
+  if (!isStorable(id)) return null;
   const sql = db();
   const rows = await sql`SELECT transcript FROM tickets WHERE id = ${id}`;
   return rows.length === 0 ? null : (JSON.parse(rows[0].transcript) as ChatMessage[]);
@@ -78,6 +79,7 @@ export async function getTicketTranscript(id: string) {
 
 // Records who resolved a ticket, and clears that if it's reopened.
 export async function updateTicketStatus(id: string, status: TicketStatus, staffId: string, staffName: string) {
+  if (!isStorable(id)) return null;
   const sql = db();
   const rows = await sql.unsafe(
     `UPDATE tickets SET
@@ -94,6 +96,7 @@ export async function updateTicketStatus(id: string, status: TicketStatus, staff
 
 // The ticket's messages are deleted with it.
 export async function deleteTicket(id: string) {
+  if (!isStorable(id)) return false;
   const sql = db();
   const result = await sql`DELETE FROM tickets WHERE id = ${id}`;
   return result.count > 0;
@@ -101,6 +104,7 @@ export async function deleteTicket(id: string) {
 
 // Returns who owns a ticket and its status, or null if it doesn't exist.
 export async function getTicketAccess(id: string) {
+  if (!isStorable(id)) return null;
   const sql = db();
   const rows = await sql`SELECT user_id, status FROM tickets WHERE id = ${id}`;
   return rows.length === 0 ? null : { ownerId: rows[0].user_id as string, status: rows[0].status as TicketStatus };

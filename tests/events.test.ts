@@ -10,7 +10,6 @@ import { EMPTY_EVENT, EVENT_FIELDS, type FestEvent } from "@/lib/event-fields";
 import { aiWasCalled, fakeClient, resetAi } from "./helpers/ai";
 import { countRows, loggedErrors, seedEvent, useTestDatabase } from "./helpers/db";
 import { request, withId } from "./helpers/http";
-import { knownBug } from "./helpers/known-bug";
 import { signInAs } from "./helpers/people";
 
 vi.mock("@/lib/claude", async (importOriginal) => {
@@ -93,7 +92,7 @@ describe("creating events", () => {
     expect(event).toMatchObject({ name: tricky, venue: tricky, custom_sections: [{ title: tricky, content: tricky }] });
   });
 
-  knownBug("BUG: a NUL character gives a clean response", async () => {
+  test("a NUL character gives a clean response", async () => {
     const response = await createEvent({ name: "before\u0000after" });
     expect([201, 400]).toContain(response.status);
   });
@@ -116,8 +115,7 @@ describe("listing events", () => {
     expect(first.map((event) => event.id)).toEqual(first.map((event) => event.id).sort());
   });
 
-  // Times are stored as printed, such as "9:00 AM", and sorted as text.
-  knownBug("BUG: events on the same day are in time order", async () => {
+  test("events on the same day are in time order", async () => {
     await seedEvent({ name: "Afternoon", date: "2026-11-14", start_time: "2:00 PM" });
     await seedEvent({ name: "Morning", date: "2026-11-14", start_time: "9:00 AM" });
     await seedEvent({ name: "Late morning", date: "2026-11-14", start_time: "10:00 AM" });

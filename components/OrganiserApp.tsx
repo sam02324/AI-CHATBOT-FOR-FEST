@@ -150,7 +150,6 @@ export function OrganiserApp({ role }: { role: Role }) {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEvents();
   }, []);
 
@@ -412,7 +411,6 @@ export function OrganiserApp({ role }: { role: Role }) {
                   {posters.map((poster, index) => (
                     <li key={index} className="w-28">
                       {/* A local data URL from the organiser's own file, so next/image doesn't apply. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={poster} alt={`Poster ${index + 1}`} className="h-36 w-28 rounded-lg border border-line object-cover" />
                       <button
                         type="button"
@@ -460,7 +458,6 @@ export function OrganiserApp({ role }: { role: Role }) {
                 <div className="flex gap-3 overflow-x-auto lg:max-h-[75vh] lg:flex-col lg:overflow-x-visible lg:overflow-y-auto">
                   {posters.map((poster, index) => (
                     // A local data URL from the organiser's own file, so next/image doesn't apply.
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={index}
                       src={poster}

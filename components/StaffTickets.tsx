@@ -243,7 +243,6 @@ export function StaffTickets({ role }: { role: Role }) {
       }
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const refresh = setInterval(whenVisible(load), REFRESH_MS);
     return () => {

@@ -13,7 +13,6 @@ import type { ChatMessage, ConversationSummary } from "@/lib/roles";
 import { ai, aiWasCalled, fakeClient, resetAi } from "./helpers/ai";
 import { countRows, exchanges, loggedErrors, savedMessages, seedConversation, seedEvent, useTestDatabase } from "./helpers/db";
 import { request, withId } from "./helpers/http";
-import { knownBug } from "./helpers/known-bug";
 import { signInAs, SOMEONE_ELSE } from "./helpers/people";
 
 vi.mock("@/lib/claude", async (importOriginal) => {
@@ -534,9 +533,7 @@ describe("when the answer fails", () => {
     expect((await savedMessages(id))[1].content).toBe(text);
   });
 
-  // The API can refuse after sending some text, and its guidance is to treat that text as incomplete
-  // and discard it. The route instead shows it and saves it as though it were the finished answer.
-  knownBug("BUG: text before a refusal isn't saved as a finished answer", async () => {
+  test("text before a refusal isn't saved as a finished answer", async () => {
     ai.script = { chunks: ["The first half of"], stopReason: "refusal" };
 
     const response = await ask("Something bad");
@@ -546,7 +543,7 @@ describe("when the answer fails", () => {
     expect(saved.map((row) => row.content)).not.toContain("The first half of");
   });
 
-  knownBug("BUG: text before a refusal doesn't look like a finished answer to the person", async () => {
+  test("text before a refusal doesn't look like a finished answer to the person", async () => {
     ai.script = { chunks: ["The first half of"], stopReason: "refusal" };
 
     const response = await ask("Something bad");
@@ -673,12 +670,12 @@ describe("the conversation routes", () => {
 describe("text Postgres can't store", () => {
   const NUL = "before\u0000after";
 
-  knownBug("BUG: a conversation ID with a NUL character starts a new chat", async () => {
+  test("a conversation ID with a NUL character starts a new chat", async () => {
     const response = await ask("Hello?", NUL);
     expect(response.status).toBe(200);
   });
 
-  knownBug("BUG: a chat ID with a NUL character reads as not found", async () => {
+  test("a chat ID with a NUL character reads as not found", async () => {
     const response = await getChat(request("/api/conversations/x"), withId(NUL));
     expect(response.status).toBe(404);
   });
@@ -689,8 +686,7 @@ describe("text Postgres can't store", () => {
     expect((await loggedErrors()).map((row) => row.source)).toEqual(["chat-history"]);
   });
 
-  // The title is saved before the messages, in separate statements, so the chat is left empty.
-  knownBug("BUG: a message that can't be saved leaves no empty chat behind in the history", async () => {
+  test("a message that can't be saved leaves no empty chat behind in the history", async () => {
     await askAndRead(`${"x".repeat(100)}\u0000`);
     expect(await countRows("conversations")).toBe(0);
   });

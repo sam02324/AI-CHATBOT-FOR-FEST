@@ -174,23 +174,21 @@ describe("reading a poster", () => {
     expect(await response.json()).toEqual(POSTER);
   });
 
-  // The route means to answer these with 422 and "enter the details manually", but the SDK's parse
-  // throws on text that isn't valid JSON, so they become a 502 and "Please try again".
-  knownBug("BUG: a reply that can't be read gives the 422 that asks for manual entry", async () => {
+  test("a reply that can't be read gives the 422 that asks for manual entry", async () => {
     signInAs("moderator");
     server.respondWith((_body, response) => sendJson(response, 200, messageWith("Sorry, not JSON")));
     const response = await readPoster(request("/api/extract", "POST", IMAGES));
     expect(response.status).toBe(422);
   });
 
-  knownBug("BUG: a reply cut off by the token limit gives the 422 that asks for manual entry", async () => {
+  test("a reply cut off by the token limit gives the 422 that asks for manual entry", async () => {
     signInAs("moderator");
     server.respondWith((_body, response) => sendJson(response, 200, messageWith('{"is_event_poster":true,', "max_tokens")));
     const response = await readPoster(request("/api/extract", "POST", IMAGES));
     expect(response.status).toBe(422);
   });
 
-  knownBug("BUG: a refusal that comes after some text gives the 422 that asks for manual entry", async () => {
+  test("a refusal that comes after some text gives the 422 that asks for manual entry", async () => {
     signInAs("moderator");
     server.respondWith((_body, response) => sendJson(response, 200, messageWith('{"is_event_poster":true,', "refusal")));
     const response = await readPoster(request("/api/extract", "POST", IMAGES));

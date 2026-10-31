@@ -47,9 +47,7 @@ export function Chat({ role }: { role: Role }) {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCards();
   }, [loadConversations, loadCards]);
 
@@ -64,7 +62,8 @@ export function Chat({ role }: { role: Role }) {
     setHandoff({ online: null });
     const response = await fetch("/api/presence").catch(() => null);
     const body = response?.ok ? await response.json() : { online: false };
-    setHandoff({ online: body.online });
+    // It stays closed if the person closed it while this was loading.
+    setHandoff((current) => (current ? { online: body.online } : current));
   }
 
   async function raiseTicket(event: FormEvent) {
@@ -151,6 +150,7 @@ export function Chat({ role }: { role: Role }) {
     setFailedQuestion("");
     setHistoryOpen(false);
     setHandoff(null);
+    setTicket(null);
     input.current?.focus();
   }
 

@@ -3,11 +3,12 @@
 // The chatbot ends an answer with a line like [[events: a1b2c3d4, e5f6a7b8]] to show event cards.
 const EVENT_MARKER = /\[\[\s*events?\s*:([^\]]*)\]\]/gi;
 // Hides a marker that is still arriving while an answer streams in.
-const PARTIAL_MARKER = /(?:\[\[[^\]\n]*\]?|\[)$/;
+const PARTIAL_MARKER = /(?:\[\[\s*events?\s*:[^\]]*\]?|\[\[[^\]\n]*\]?|\[)$/i;
 const MAX_CARDS = 3;
 const LINK = /(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"]+$/;
-const BARE_DOMAIN = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:[/?#]\S*)?$/i;
+// The last part has to be a real top-level domain, so "N.A" and "10.30" don't become links.
+const BARE_DOMAIN = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z][a-z0-9-]+(?:[/?#]\S*)?$/i;
 
 export type AnswerPart = { text: string } | { text: string; href: string };
 
@@ -58,7 +59,8 @@ export function splitLinks(text: string): AnswerPart[] {
 export function formatEventDate(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   const parsed = new Date(`${date}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return date;
+  // new Date() rolls 30 February over to 2 March, so the result has to match what was stored.
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return date;
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",

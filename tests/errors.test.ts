@@ -5,7 +5,6 @@ import { closeDb, db } from "@/lib/db";
 import { listRecentErrors, logError } from "@/lib/errors";
 import { countRows, loggedErrors, useTestDatabase } from "./helpers/db";
 import { request } from "./helpers/http";
-import { knownBug } from "./helpers/known-bug";
 import { signInAs, signOut } from "./helpers/people";
 
 useTestDatabase();
@@ -140,19 +139,18 @@ describe("logError", () => {
     });
   });
 
-  // It promises it never throws, but only the database write is inside its try.
   describe("with values that are awkward to read", () => {
-    knownBug("BUG: never throws for an object that can't become text", async () => {
+    test("never throws for an object that can't become text", async () => {
       await expect(logError("chat", Object.create(null))).resolves.toBeUndefined();
     });
 
-    knownBug("BUG: never throws for an error whose message isn't text", async () => {
+    test("never throws for an error whose message isn't text", async () => {
       const error = new Error("x");
       (error as { message: unknown }).message = { code: 42 };
       await expect(logError("chat", error)).resolves.toBeUndefined();
     });
 
-    knownBug("BUG: never throws for an error whose stack isn't text", async () => {
+    test("never throws for an error whose stack isn't text", async () => {
       const error = new Error("x");
       (error as { stack: unknown }).stack = { frames: [] };
       await expect(logError("chat", error)).resolves.toBeUndefined();
